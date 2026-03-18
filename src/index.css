@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+@theme {
+  --color-service-color: #fd7a28;
+  --color-background-color: #1A1410;
+  --color-background-gradation-color: #221105;
+  --color-modal-background-color: #2A2218;
+  --color-shadow-color: #22110060;
+  --color-border-color: #4A3F34;
+  --color-modal-box-color: #3A2F24;
+  --color-primary-text-color: #E0E0E0;
+  --color-secondary-text-color: #A0A0A0;
+  --color-button-progress-color: #c85f1f;
+}
