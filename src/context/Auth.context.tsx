@@ -18,13 +18,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // 앱 최초 진입 시 쿠키 유효성 확인
   useEffect(() => {
-    apiFetch("/auth/me", {}, forceLogout)
-      .then(res => setIsAuthenticated(res.ok))
-      .catch(() => setIsAuthenticated(false));
+    apiFetch("/v1/auth/me", {}, forceLogout)
+      .then(res => { console.log(res.ok, res.status); setIsAuthenticated(res.ok); })
+      .catch(e => { console.error(e); setIsAuthenticated(false); });
   }, [forceLogout]);
 
   async function login(email: string, password: string) {
-    const res = await apiFetch("/auth/login", {
+    const res = await apiFetch("/v1/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(email: string, password: string, passwordConfirm: string, display: string) {
-    const res = await apiFetch("/auth/register", {
+    const res = await apiFetch("/v1/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password, passwordConfirm, display }),

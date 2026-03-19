@@ -13,9 +13,9 @@ const emailRules = [
 
 const passwordRules = [
   { label: "8자 이상", test: (v: string) => v.length >= 8 },
-  { label: "영문으로 작성됨", test: (v: string) => /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/.test(v) },
+  { label: "영문으로 작성됨", test: (v: string) => /^[a-zA-Z0-9!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]+$/.test(v) },
   { label: "소문자 또는 대문자 포함", test: (v: string) => /[a-zA-Z]/.test(v) },
-  { label: "특수문자 포함", test: (v: string) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(v) },
+  { label: "특수문자 포함", test: (v: string) => /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?`~]/.test(v) },
 ];
 
 const displayNameRules = [
@@ -50,7 +50,7 @@ export default function Auth() {
     setLoading(true);
     setApiError("");
     try {
-      const res = await fetch(`${API_URL}/auth/check-email`, {
+      const res = await fetch(`${API_URL}/v1/auth/check-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

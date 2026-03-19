@@ -2,11 +2,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import Navigation from "./components/Navigation"
 import { ModalProvider } from "./context/Modal.context"
 import { AuthProvider, useAuth } from "./context/Auth.context"
+import { WorkspaceProvider } from "./context/Workspace.context"
+import Dashboard from "./pages/Dashboard"
 import Overview from "./pages/Overview"
 import Agents from "./pages/Agents"
 import Users from "./pages/Users"
 import Activity from "./pages/Activity"
 import Settings from "./pages/Settings"
+import WorkspaceSettings from "./pages/WorkspaceSettings"
 import Auth from "./pages/Auth"
 
 function AppLayout() {
@@ -15,12 +18,14 @@ function AppLayout() {
       <Navigation />
       <main className="ml-56 flex-1 p-8">
         <Routes>
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/overview" element={<Overview />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/users" element={<Users />} />
           <Route path="/activity" element={<Activity />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/overview" replace />} />
+          <Route path="/workspace-settings" element={<WorkspaceSettings />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
     </div>
@@ -35,7 +40,7 @@ function AuthGate() {
 
   return (
     <Routes>
-      <Route path="/auth" element={<Auth />} />
+      <Route path="/auth" element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Auth />} />
       <Route path="*" element={isAuthenticated ? <AppLayout /> : <Navigate to="/auth" replace />} />
     </Routes>
   )
@@ -45,9 +50,11 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ModalProvider>
-          <AuthGate />
-        </ModalProvider>
+        <WorkspaceProvider>
+          <ModalProvider>
+            <AuthGate />
+          </ModalProvider>
+        </WorkspaceProvider>
       </AuthProvider>
     </BrowserRouter>
   )
