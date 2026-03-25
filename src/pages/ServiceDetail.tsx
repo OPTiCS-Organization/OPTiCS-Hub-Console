@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import { ArrowLeft, Terminal, GitBranch, Package, Play, Square, RefreshCw, Loader2 } from "lucide-react";
+import { ArrowLeft, Terminal, GitBranch, Package, Play, Square, RefreshCw, Loader2, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
@@ -247,6 +247,23 @@ export default function ServiceDetail() {
     }
   }
 
+  async function handleDeleteService() {
+    if (!service || !confirm(`'${service.serviceName}' 서비스를 삭제하시겠습니까?`)) return;
+    try {
+      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}`, {
+        method: 'DELETE',
+      }, logout);
+      if (res.ok) {
+        navigate('/services');
+      } else {
+        const body = await res.json() as { message?: string };
+        console.log(body);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   return (
     <div className="text-primary-text-color mt-20">
 
@@ -300,6 +317,7 @@ export default function ServiceDetail() {
                 openModal('재배포', <RedeployForm service={service} onRedeployed={() => {}} />);
               }}
             />
+            <Trash2 className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleDeleteService()} />
           </div>
         </div>
       </div>
