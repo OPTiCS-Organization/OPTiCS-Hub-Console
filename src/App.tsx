@@ -11,6 +11,8 @@ import Activity from "./pages/Activity"
 import Settings from "./pages/Settings"
 import WorkspaceSettings from "./pages/WorkspaceSettings"
 import Auth from "./pages/Auth"
+import Services from "./pages/Services"
+import ServiceDetail from "./pages/ServiceDetail"
 
 function AppLayout() {
   return (
@@ -25,6 +27,8 @@ function AppLayout() {
           <Route path="/activity" element={<Activity />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/workspace-settings" element={<WorkspaceSettings />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/services/:serviceIndex" element={<ServiceDetail />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>

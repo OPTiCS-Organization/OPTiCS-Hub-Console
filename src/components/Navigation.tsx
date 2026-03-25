@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutPanelTop, Server, Users, Settings, Activity, ChevronDown, Check, Plus, Trash2, Loader2, ArrowLeft, Layers, LayoutDashboard } from "lucide-react";
+import { LayoutPanelTop, Server, Settings, ChevronDown, Check, Plus, Trash2, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash } from "lucide-react";
 import { useWorkspace } from "../context/Workspace.context";
 import { useModal } from "../context/Modal.context";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
@@ -15,8 +15,7 @@ const mainMenu = [
 const workspaceMenu = [
   { name: 'Overview', path: '/overview', icon: <LayoutPanelTop className={IconSize} /> },
   { name: 'Agents', path: '/agents', icon: <Server className={IconSize} /> },
-  { name: 'Users', path: '/users', icon: <Users className={IconSize} /> },
-  { name: 'Activity', path: '/activity', icon: <Activity className={IconSize} /> },
+  { name: 'Services', path: '/services', icon: <ServerCrash className={IconSize} /> },
   { name: 'Workspace Settings', path: '/workspace-settings', icon: <Settings className={IconSize} /> },
 ]
 

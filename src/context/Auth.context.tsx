@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     apiFetch("/v1/auth/me", {}, forceLogout)
       .then(res => { console.log(res.ok, res.status); setIsAuthenticated(res.ok); })
-      .catch(e => { console.error(e); setIsAuthenticated(false); });
+        .catch(e => { console.error(e); setIsAuthenticated(false); });                            
   }, [forceLogout]);
 
   async function login(email: string, password: string) {
