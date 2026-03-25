@@ -179,6 +179,7 @@ export default function ServiceDetail() {
         agentCode: service.agentCode,
         serviceIndex: Number(serviceIndex),
         serviceName: service.serviceName,
+        deployPreset: service.serviceDeployPreset,
       });
     });
 
