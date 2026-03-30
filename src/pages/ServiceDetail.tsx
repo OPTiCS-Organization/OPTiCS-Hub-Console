@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { io, Socket } from "socket.io-client";
-import { ArrowLeft, Terminal, GitBranch, Package, Play, Square, RefreshCw, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Terminal, GitBranch, Package, Play, Square, RefreshCw, Loader2, Trash2, Plus, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
@@ -24,6 +24,7 @@ interface LogEntry {
   serviceIndex: number;
   log: string;
   timestamp: string;
+  sessionId: number;
 }
 
 const statusDot: Record<ServiceItem['serviceStatus'], string> = {
@@ -59,24 +60,46 @@ function RedeployForm({ service, onRedeployed }: {
 }) {
   const { logout } = useAuth();
   const { closeModal } = useModal();
+
+  const parseUrls = (raw: string): string[] => {
+    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : [raw]; }
+    catch { return [raw]; }
+  };
+
   const [form, setForm] = useState({
     serviceName: service.serviceName,
     servicePort: String(service.servicePort),
-    serviceSourceUrl: service.serviceSourceUrl,
     serviceVersion: service.serviceVersion,
-    serviceDeployPreset: service.serviceDeployPreset,
+    serviceDeployPreset: service.serviceDeployPreset as string,
   });
+  const [sourceUrls, setSourceUrls] = useState<string[]>(parseUrls(service.serviceSourceUrl));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function set(key: keyof typeof form, value: string) {
     setForm(f => ({ ...f, [key]: value }));
+    if (key === 'serviceDeployPreset' && value !== 'compose') {
+      setSourceUrls(prev => [prev[0] ?? '']);
+    }
+  }
+
+  function setUrl(index: number, value: string) {
+    setSourceUrls(prev => prev.map((u, i) => i === index ? value : u));
+  }
+
+  function addUrl() {
+    setSourceUrls(prev => [...prev, '']);
+  }
+
+  function removeUrl(index: number) {
+    setSourceUrls(prev => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    const sourceUrl = sourceUrls.length === 1 ? sourceUrls[0] : sourceUrls;
     try {
       const res = await apiFetch(`/v1/workspace/services/${service.serviceIndex}/redeploy`, {
         method: 'POST',
@@ -84,7 +107,7 @@ function RedeployForm({ service, onRedeployed }: {
         body: JSON.stringify({
           serviceName: form.serviceName,
           servicePort: parseInt(form.servicePort),
-          serviceSourceUrl: form.serviceSourceUrl,
+          serviceSourceUrl: sourceUrl,
           serviceVersion: form.serviceVersion,
           serviceDeployPreset: form.serviceDeployPreset,
         }),
@@ -103,6 +126,8 @@ function RedeployForm({ service, onRedeployed }: {
     }
   }
 
+  const isCompose = form.serviceDeployPreset === 'compose';
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
@@ -111,8 +136,33 @@ function RedeployForm({ service, onRedeployed }: {
       </div>
       <div className="flex gap-3">
         <div className="flex-1 flex flex-col gap-1.5">
-          <label className={labelCls}>소스 URL</label>
-          <input className={inputCls} value={form.serviceSourceUrl} onChange={e => set('serviceSourceUrl', e.target.value)} required />
+          <div className="flex items-center justify-between">
+            <label className={labelCls}>소스 URL</label>
+            {isCompose && (
+              <button type="button" onClick={addUrl} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+                <Plus className="w-3 h-3" />
+                URL 추가
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
+            {sourceUrls.map((url, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  className={inputCls}
+                  placeholder={i === 0 ? "https://github.com/..." : "https://github.com/... (추가 레포)"}
+                  value={url}
+                  onChange={e => setUrl(i, e.target.value)}
+                  required={i === 0}
+                />
+                {isCompose && sourceUrls.length > 1 && (
+                  <button type="button" onClick={() => removeUrl(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
         <div className="w-28 flex flex-col gap-1.5">
           <label className={labelCls}>포트</label>
@@ -158,6 +208,9 @@ export default function ServiceDetail() {
 
   const [service, setService] = useState<ServiceItem | null>(state?.service ?? null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
+  const [currentSessionId, setCurrentSessionId] = useState<number>(0);
+  const sessionIdRef = useRef<number>(0);
   const socketRef = useRef<Socket | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
 
@@ -165,8 +218,12 @@ export default function ServiceDetail() {
   const { openModal } = useModal();
   const { currentWorkspace } = useWorkspace();
 
+  const serviceRef = useRef<ServiceItem | null>(service);
+  useEffect(() => { serviceRef.current = service; }, [service]);
+
   useEffect(() => {
-    if (!service || !serviceIndex) return;
+    if (!serviceRef.current || !serviceIndex || !serviceRef.current.agentCode) return;
+    const initial = serviceRef.current;
 
     const socket: Socket = io(`${import.meta.env.VITE_API_URL}/console`, {
       transports: ['websocket'],
@@ -176,33 +233,44 @@ export default function ServiceDetail() {
 
     socket.on('connect', () => {
       socket.emit('subscribe-log', {
-        agentCode: service.agentCode,
+        agentCode: initial.agentCode,
         serviceIndex: Number(serviceIndex),
-        serviceName: service.serviceName,
-        deployPreset: service.serviceDeployPreset,
+        serviceName: initial.serviceName,
+        deployPreset: initial.serviceDeployPreset,
       });
     });
 
-    socket.on('service-log', (data: LogEntry) => {
+    socket.on('service-log', (data: Omit<LogEntry, 'sessionId'>) => {
       if (data.serviceIndex !== Number(serviceIndex)) return;
-      setLogs(prev => [...prev, data].slice(-1000));
+      setLogs(prev => [...prev, { ...data, sessionId: sessionIdRef.current }].slice(-1000));
     });
 
     socket.on('service-status', (data: { serviceIndex: number; status: ServiceItem['serviceStatus'] }) => {
       if (data.serviceIndex !== Number(serviceIndex)) return;
-      if (data.status === 'stopped' || data.status === 'restarting' as ServiceItem['serviceStatus']) setLogs([]);
+      if (data.status === 'building') setLogs([]);
+      if (data.status === 'running') {
+        sessionIdRef.current += 1;
+        setCurrentSessionId(sessionIdRef.current);
+        socket.emit('subscribe-log', {
+          agentCode: initial.agentCode,
+          serviceIndex: Number(serviceIndex),
+          serviceName: initial.serviceName,
+          deployPreset: initial.serviceDeployPreset,
+        });
+      }
       setService(prev => prev ? { ...prev, serviceStatus: data.status } : prev);
     });
 
     return () => {
+      const cur = serviceRef.current;
       socket.emit('unsubscribe-log', {
-        agentCode: service.agentCode,
-        serviceName: service.serviceName,
+        agentCode: cur?.agentCode ?? initial.agentCode,
+        serviceName: cur?.serviceName ?? initial.serviceName,
       });
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [service, serviceIndex]);
+  }, [serviceIndex]);
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -302,12 +370,21 @@ export default function ServiceDetail() {
               </>
             )}
           </div>
-          {service.serviceSourceUrl && (
-            <div className="flex items-center gap-1.5 mt-1 text-xs text-secondary-text-color/60">
-              <GitBranch className="w-3 h-3 shrink-0" />
-              <span className="font-mono truncate">{service.serviceSourceUrl}</span>
-            </div>
-          )}
+          {service.serviceSourceUrl && (() => {
+            let urls: string[];
+            try { const p = JSON.parse(service.serviceSourceUrl); urls = Array.isArray(p) ? p : [service.serviceSourceUrl]; }
+            catch { urls = [service.serviceSourceUrl]; }
+            return (
+              <div className="flex flex-col gap-0.5 mt-1">
+                {urls.map((url, i) => (
+                  <div key={i} className="flex items-center gap-1.5 text-xs text-secondary-text-color/60">
+                    <GitBranch className="w-3 h-3 shrink-0" />
+                    <span className="font-mono truncate">{url}</span>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
           <div className="mt-1 flex items-center gap-3">
             <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
             <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />
@@ -341,16 +418,43 @@ export default function ServiceDetail() {
         <div className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-5">
           {logs.length === 0
             ? <span className="text-secondary-text-color/40">로그 대기 중...</span>
-            : logs.map((entry, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-secondary-text-color/40 shrink-0">
-                  {new Date(entry.timestamp).toLocaleTimeString('ko-KR')}
-                </span>
-                <span className={entry.log.startsWith('ERROR') ? 'text-red-400' : 'text-primary-text-color'}>
-                  {entry.log}
-                </span>
-              </div>
-            ))
+            : (() => {
+              const currentSession = currentSessionId;
+              const sessions = Array.from(new Set(logs.map(e => e.sessionId))).sort((a, b) => a - b);
+              return sessions.map(sid => {
+                const sessionLogs = logs.filter(e => e.sessionId === sid);
+                const isCurrent = sid === currentSession;
+                const isExpanded = expandedSessions.has(sid);
+                if (!isCurrent) {
+                  return (
+                    <div key={sid} className="mb-1">
+                      <button
+                        onClick={() => setExpandedSessions(prev => {
+                          const next = new Set(prev);
+                          next.has(sid) ? next.delete(sid) : next.add(sid);
+                          return next;
+                        })}
+                        className="text-secondary-text-color/40 hover:text-secondary-text-color transition-colors cursor-pointer text-[10px] py-0.5"
+                      >
+                        {isExpanded ? '▾' : '▸'} 이전 세션 로그 {sessionLogs.length}줄
+                      </button>
+                      {isExpanded && sessionLogs.map((entry, i) => (
+                        <div key={i} className="flex gap-2 opacity-40">
+                          <span className="text-secondary-text-color/60 shrink-0">{(() => { const d = new Date(entry.timestamp); const ampm = d.getHours() < 12 ? 'AM' : 'PM'; const h = String(d.getHours() % 12 || 12).padStart(2, '0'); const m = String(d.getMinutes()).padStart(2, '0'); const s = String(d.getSeconds()).padStart(2, '0'); return `${ampm} ${h}:${m}:${s}`; })()}</span>
+                          <span className={entry.log.startsWith('ERROR') ? 'text-red-400' : 'text-primary-text-color'}>{entry.log}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                }
+                return sessionLogs.map((entry, i) => (
+                  <div key={`${sid}-${i}`} className="flex gap-2">
+                    <span className="text-secondary-text-color/40 shrink-0">{(() => { const d = new Date(entry.timestamp); const ampm = d.getHours() < 12 ? 'AM' : 'PM'; const h = String(d.getHours() % 12 || 12).padStart(2, '0'); const m = String(d.getMinutes()).padStart(2, '0'); const s = String(d.getSeconds()).padStart(2, '0'); return `${ampm} ${h}:${m}:${s}`; })()}</span>
+                    <span className={entry.log.startsWith('ERROR') ? 'text-red-400' : 'text-primary-text-color'}>{entry.log}</span>
+                  </div>
+                ));
+              });
+            })()
           }
           <div ref={logEndRef} />
         </div>

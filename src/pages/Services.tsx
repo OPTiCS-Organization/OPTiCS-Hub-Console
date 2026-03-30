@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, RefreshCw, GitBranch, Package, Plus } from "lucide-react";
+import { Loader2, RefreshCw, GitBranch, Package, Plus, X } from "lucide-react";
 import { io } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 
@@ -36,7 +36,7 @@ interface EnvEntry {
 interface ServiceFormState {
   serviceName: string;
   servicePort: string;
-  serviceSourceUrl: string;
+  serviceSourceUrls: string[];
   serviceVersion: string;
   serviceDeployPreset: string;
   agentIndex: string;
@@ -83,7 +83,7 @@ function CreateServiceForm({ workspaceIdx, onCreated }: {
   const [form, setForm] = useState<ServiceFormState>({
     serviceName: '',
     servicePort: '',
-    serviceSourceUrl: '',
+    serviceSourceUrls: [''],
     serviceVersion: '1.0.0',
     serviceDeployPreset: 'dockerfile',
     agentIndex: '',
@@ -103,8 +103,30 @@ function CreateServiceForm({ workspaceIdx, onCreated }: {
       .catch(() => { });
   }, [workspaceIdx, logout]);
 
-  function set(key: keyof ServiceFormState, value: string) {
-    setForm(f => ({ ...f, [key]: value }));
+  function set(key: Exclude<keyof ServiceFormState, 'serviceSourceUrls'>, value: string) {
+    setForm(f => {
+      const next = { ...f, [key]: value };
+      if (key === 'serviceDeployPreset' && value !== 'compose') {
+        next.serviceSourceUrls = [f.serviceSourceUrls[0] ?? ''];
+      }
+      return next;
+    });
+  }
+
+  function setUrl(index: number, value: string) {
+    setForm(f => {
+      const urls = [...f.serviceSourceUrls];
+      urls[index] = value;
+      return { ...f, serviceSourceUrls: urls };
+    });
+  }
+
+  function addUrl() {
+    setForm(f => ({ ...f, serviceSourceUrls: [...f.serviceSourceUrls, ''] }));
+  }
+
+  function removeUrl(index: number) {
+    setForm(f => ({ ...f, serviceSourceUrls: f.serviceSourceUrls.filter((_, i) => i !== index) }));
   }
 
   function addEnvEntry() {
@@ -124,6 +146,7 @@ function CreateServiceForm({ workspaceIdx, onCreated }: {
     setLoading(true);
     setError(null);
     const env = Object.fromEntries(envEntries.filter(e => e.key.trim()).map(e => [e.key, e.value]));
+    const sourceUrl = form.serviceSourceUrls.length === 1 ? form.serviceSourceUrls[0] : form.serviceSourceUrls;
     try {
       const res = await apiFetch(`/v1/workspace/services/deploy`, {
         method: 'POST',
@@ -132,7 +155,7 @@ function CreateServiceForm({ workspaceIdx, onCreated }: {
           workspaceIdx: workspaceIdx,
           serviceName: form.serviceName,
           servicePort: parseInt(form.servicePort),
-          serviceSourceUrl: form.serviceSourceUrl,
+          serviceSourceUrl: sourceUrl,
           serviceVersion: form.serviceVersion,
           serviceDeployPreset: form.serviceDeployPreset,
           agentIndex: parseInt(form.agentIndex),
@@ -153,6 +176,8 @@ function CreateServiceForm({ workspaceIdx, onCreated }: {
     }
   }
 
+  const isCompose = form.serviceDeployPreset === 'compose';
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
@@ -162,8 +187,33 @@ function CreateServiceForm({ workspaceIdx, onCreated }: {
 
       <div className="flex gap-3">
         <div className="flex-1 flex flex-col gap-1.5">
-          <label className={labelCls}>소스 URL <span className="text-service-color">*</span></label>
-          <input className={inputCls} placeholder="https://github.com/..." value={form.serviceSourceUrl} onChange={e => set('serviceSourceUrl', e.target.value)} required />
+          <div className="flex items-center justify-between">
+            <label className={labelCls}>소스 URL <span className="text-service-color">*</span></label>
+            {isCompose && (
+              <button type="button" onClick={addUrl} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+                <Plus className="w-3 h-3" />
+                URL 추가
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
+            {form.serviceSourceUrls.map((url, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <input
+                  className={inputCls}
+                  placeholder={i === 0 ? "https://github.com/..." : "https://github.com/... (추가 레포)"}
+                  value={url}
+                  onChange={e => setUrl(i, e.target.value)}
+                  required={i === 0}
+                />
+                {isCompose && form.serviceSourceUrls.length > 1 && (
+                  <button type="button" onClick={() => removeUrl(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer shrink-0">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
         <div className="w-28 flex flex-col gap-1.5">
           <label className={labelCls}>포트 <span className="text-service-color">*</span></label>
@@ -277,12 +327,17 @@ function ServiceCard({ service }: { service: ServiceItem }) {
       </div>
 
       <div className="px-4 pb-3 flex flex-col gap-1.5">
-        {service.serviceSourceUrl && (
-          <div className="flex items-center gap-1.5 text-xs text-secondary-text-color/70">
-            <GitBranch className="w-3 h-3 shrink-0" />
-            <span className="font-mono truncate">{service.serviceSourceUrl}</span>
-          </div>
-        )}
+        {service.serviceSourceUrl && (() => {
+          let urls: string[];
+          try { urls = JSON.parse(service.serviceSourceUrl); if (!Array.isArray(urls)) urls = [service.serviceSourceUrl]; }
+          catch { urls = [service.serviceSourceUrl]; }
+          return urls.map((url, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-xs text-secondary-text-color/70">
+              <GitBranch className="w-3 h-3 shrink-0" />
+              <span className="font-mono truncate">{url}</span>
+            </div>
+          ));
+        })()}
       </div>
 
       <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
