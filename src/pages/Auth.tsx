@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, X } from "lucide-react";
 import { useAuth } from "../context/Auth.context";
+import Field from "../components/ui/Field";
+import SubmitButton from "../components/ui/SubmitButton";
+import ErrorMessage from "../components/ui/ErrorMessage";
+import Checklist from "../components/ui/Checklist";
+import StepHeader from "../components/ui/StepHeader";
 
 type Step = "email" | "login" | "register-password" | "register-profile";
 
@@ -203,66 +207,4 @@ export default function Auth() {
       </div>
     </div>
   );
-}
-
-// ── 내부 컴포넌트 ──────────────────────────────────────────
-
-function Checklist({ rules, value }: { rules: { label: string; test: (v: string) => boolean }[]; value: string }) {
-  return (
-    <ul className="flex flex-col gap-1 -mt-2">
-      {rules.map(rule => {
-        const passed = rule.test(value);
-        return (
-          <li key={rule.label} className={`flex items-center gap-1.5 text-xs transition-colors duration-150 ${passed ? "text-service-color" : "text-secondary-text-color"}`}>
-            {passed ? <Check className="w-3 h-3 shrink-0" /> : <X className="w-3 h-3 shrink-0" />}
-            {rule.label}
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function Field({ label, type, value, onChange, placeholder, autoFocus }: {
-  label: string; type: string; value: string;
-  onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] text-secondary-text-color font-medium uppercase tracking-widest">{label}</label>
-      <input
-        type={type} value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder} autoFocus={autoFocus}
-        className="w-full bg-modal-box-color border border-border-color rounded-sm px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none focus:border-service-color transition-colors duration-100"
-      />
-    </div>
-  );
-}
-
-function StepHeader({ email, onBack, label }: { email: string; onBack: () => void; label: string }) {
-  return (
-    <div>
-      <p className="text-primary-text-color font-semibold text-sm mb-1">{label}</p>
-      <div className="flex items-center gap-1.5">
-        <span className="text-secondary-text-color text-xs">{email}</span>
-        <button type="button" onClick={onBack} className="text-service-color text-xs hover:underline cursor-pointer">변경</button>
-      </div>
-    </div>
-  );
-}
-
-function SubmitButton({ children, loading }: { children: React.ReactNode; loading?: boolean }) {
-  return (
-    <button
-      type="submit" disabled={loading}
-      className="w-full bg-service-color hover:bg-button-progress-color disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm py-2 rounded-sm transition-colors duration-100 cursor-pointer"
-    >
-      {loading ? "처리 중..." : children}
-    </button>
-  );
-}
-
-function ErrorMessage({ children }: { children: React.ReactNode }) {
-  return <p className="text-red-400 text-xs">{children}</p>;
 }
