@@ -180,7 +180,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         {agents.length === 0
           ? <p className="text-secondary-text-color text-xs py-1">연결된 에이전트가 없습니다.</p>
           : <select className={inputCls} value={form.agentIndex} onChange={e => set('agentIndex', e.target.value)}>
-            {agents.map(a => <option key={a.agentIndex} value={a.agentIndex}>{a.agentCode}</option>)}
+            {agents.map(a => <option key={a.agentIndex} value={a.agentIndex}>{a.agentName}</option>)}
           </select>
         }
       </div>

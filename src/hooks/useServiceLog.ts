@@ -26,7 +26,7 @@ export function useServiceLog(
   const setServiceStatusRef = useRef<((status: ServiceItem['serviceStatus']) => void) | null>(null);
 
   useEffect(() => {
-    if (!serviceRef.current || !serviceIndex || !serviceRef.current.agentCode) return;
+    if (!serviceRef.current || !serviceIndex || !serviceRef.current.agentUuid) return;
     const initial = serviceRef.current;
 
     const socket: Socket = io(`${import.meta.env.VITE_API_URL}/console`, {
@@ -37,7 +37,7 @@ export function useServiceLog(
 
     socket.on('connect', () => {
       socket.emit('subscribe-log', {
-        agentCode: initial.agentCode,
+        agentUuid: initial.agentUuid,
         serviceIndex: Number(serviceIndex),
         serviceName: initial.serviceName,
         deployPreset: initial.serviceDeployPreset,
@@ -56,7 +56,7 @@ export function useServiceLog(
         sessionIdRef.current += 1;
         setCurrentSessionId(sessionIdRef.current);
         socket.emit('subscribe-log', {
-          agentCode: initial.agentCode,
+          agentUuid: initial.agentUuid,
           serviceIndex: Number(serviceIndex),
           serviceName: initial.serviceName,
           deployPreset: initial.serviceDeployPreset,
@@ -68,7 +68,7 @@ export function useServiceLog(
     return () => {
       const cur = serviceRef.current;
       socket.emit('unsubscribe-log', {
-        agentCode: cur?.agentCode ?? initial.agentCode,
+        agentUuid: cur?.agentUuid ?? initial.agentUuid,
         serviceName: cur?.serviceName ?? initial.serviceName,
       });
       socket.disconnect();

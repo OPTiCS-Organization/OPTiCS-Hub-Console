@@ -9,4 +9,6 @@ export interface ServiceItem {
   serviceCreatedAt: string;
   agentIndex: number;
   agentCode: string | null;
+  agentName: string | null;
+  agentUuid: string | null;
 }

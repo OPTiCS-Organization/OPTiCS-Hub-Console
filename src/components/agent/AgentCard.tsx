@@ -4,6 +4,8 @@ export interface Agent {
   agentIndex: number;
   agentIp: string | null;
   agentCode: string;
+  agentName: string;
+  agentUuid: string;
   agentConnection: 'unlinked' | 'requested' | 'linked';
   agentStatus: 'waiting' | 'online' | 'offline' | 'restarting' | 'failed';
   agentCreatedAt: string;
@@ -49,14 +51,17 @@ export default function AgentCard({ agent }: { agent: Agent }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-primary-text-color font-semibold text-sm font-mono truncate">
-              {agent.agentCode}
+            <span className="text-primary-text-color font-semibold text-sm truncate">
+              {agent.agentName}
             </span>
             <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${connectionBadge[agent.agentConnection]}`}>
               {connectionLabel[agent.agentConnection]}
             </span>
           </div>
           <p className="text-secondary-text-color text-xs font-mono">
+            {agent.agentCode}
+          </p>
+          <p className="text-secondary-text-color/60 text-xs font-mono mt-0.5">
             {agent.agentIp ?? <span className="text-secondary-text-color/40">IP 비공개</span>}
           </p>
         </div>

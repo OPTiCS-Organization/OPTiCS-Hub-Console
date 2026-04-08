@@ -109,10 +109,10 @@ export default function ServiceDetail() {
             <span className="text-secondary-text-color">v{service.serviceVersion}</span>
             <span className="text-secondary-text-color/40">·</span>
             <span className="text-secondary-text-color">:{service.servicePort}</span>
-            {service.agentCode && (
+            {service.agentName && (
               <>
                 <span className="text-secondary-text-color/40">·</span>
-                <span className="font-mono text-secondary-text-color/70">{service.agentCode}</span>
+                <span className="text-secondary-text-color/70">{service.agentName}</span>
               </>
             )}
           </div>
