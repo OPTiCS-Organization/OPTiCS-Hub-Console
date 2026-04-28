@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, GitBranch, Package, Play, Square, RefreshCw, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
@@ -17,6 +17,7 @@ export default function ServiceDetail() {
   const navigate = useNavigate();
 
   const [service, setService] = useState<ServiceItem | null>(state?.service ?? null);
+  const [serviceLoading, setServiceLoading] = useState(!state?.service);
   const { logout } = useAuth();
   const { openModal } = useModal();
   const { currentWorkspace } = useWorkspace();
@@ -27,16 +28,45 @@ export default function ServiceDetail() {
     currentSessionId,
     logEndRef,
     onServiceStatusChangeRef,
-  } = useServiceLog(service, serviceIndex);
-
-  const serviceRef = useRef<ServiceItem | null>(service);
-  useEffect(() => { serviceRef.current = service; }, [service]);
+  } = useServiceLog(service, serviceIndex, currentWorkspace?.workspaceIndex);
 
   useEffect(() => {
     onServiceStatusChangeRef.current = (status: ServiceItem['serviceStatus']) => {
       setService(prev => prev ? { ...prev, serviceStatus: status } : prev);
     };
   }, [onServiceStatusChangeRef]);
+
+  const fetchService = useCallback(async () => {
+    if (!currentWorkspace || !serviceIndex) return;
+    setServiceLoading(true);
+    try {
+      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/services`, {}, logout);
+      if (!res.ok) {
+        setService(null);
+        return;
+      }
+      const body = await res.json() as { data: { services: ServiceItem[] } };
+      const found = body.data.services.find(item => item.serviceIndex === Number(serviceIndex)) ?? null;
+      setService(found);
+    } catch (error) {
+      console.log(error);
+      setService(null);
+    } finally {
+      setServiceLoading(false);
+    }
+  }, [currentWorkspace, serviceIndex, logout]);
+
+  useEffect(() => {
+    void fetchService();
+  }, [fetchService]);
+
+  if (!service && serviceLoading) {
+    return (
+      <div className="text-primary-text-color mt-20 flex flex-col items-center gap-3">
+        <p className="text-secondary-text-color text-sm">서비스 정보를 불러오는 중...</p>
+      </div>
+    );
+  }
 
   if (!service) {
     return (
@@ -138,7 +168,7 @@ export default function ServiceDetail() {
               className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors"
               onClick={() => {
                 if (!service || !currentWorkspace) return;
-                openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { }} />);
+                openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { void fetchService(); }} />);
               }}
             />
             <Trash2 className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleDeleteService()} />

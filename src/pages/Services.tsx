@@ -36,9 +36,14 @@ export default function Services() {
   useEffect(() => { fetchServices(); }, [fetchServices]);
 
   useEffect(() => {
+    if (!currentWorkspace) return;
     const socket = io(`${import.meta.env.VITE_API_URL}/console`, {
       transports: ['websocket'],
       reconnection: true,
+      withCredentials: true,
+    });
+    socket.on('connect', () => {
+      socket.emit('subscribe-workspace', { workspaceIndex: currentWorkspace.workspaceIndex });
     });
     socket.on('agent-updated', () => { void fetchServices(); });
     socket.on('service-status', (data: { serviceIndex: number; status: ServiceItem['serviceStatus'] }) => {
@@ -47,7 +52,7 @@ export default function Services() {
       );
     });
     return () => { socket.disconnect(); };
-  }, [fetchServices]);
+  }, [currentWorkspace, fetchServices]);
 
   function openCreateModal() {
     if (!currentWorkspace) return;
