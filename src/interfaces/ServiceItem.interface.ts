@@ -2,7 +2,10 @@ export interface ServiceItem {
   serviceIndex: number;
   serviceName: string;
   servicePort: number;
+  serviceHostPort?: number;
+  serviceContainerPort?: number;
   serviceSourceUrl: string;
+  serviceRootDirectory?: string | null;
   serviceStatus: 'waiting' | 'building' | 'running' | 'stopped' | 'failed' | 'removed';
   serviceVersion: string;
   serviceDeployPreset: 'dockerfile' | 'compose' | 'preset_nestjs';

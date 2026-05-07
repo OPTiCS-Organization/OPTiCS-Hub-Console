@@ -28,7 +28,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
 
   const [form, setForm] = useState({
     serviceName: service?.serviceName ?? '',
-    servicePort: service ? String(service.servicePort) : '',
+    serviceHostPort: service ? String(service.serviceHostPort ?? service.servicePort) : '',
+    serviceContainerPort: service ? String(service.serviceContainerPort ?? service.servicePort) : '',
+    serviceRootDirectory: service?.serviceRootDirectory ?? '',
     serviceVersion: service?.serviceVersion ?? '1.0.0',
     serviceDeployPreset: (service?.serviceDeployPreset ?? 'dockerfile') as string,
     agentIndex: service ? String(service.agentIndex) : '',
@@ -68,6 +70,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     setError(null);
     const sourceUrl = sourceUrls.length === 1 ? sourceUrls[0] : sourceUrls;
     const env = Object.fromEntries(envEntries.filter(e => e.key.trim()).map(e => [e.key, e.value]));
+    const serviceHostPort = parseInt(form.serviceHostPort);
+    const serviceContainerPort = parseInt(form.serviceContainerPort);
+    const serviceRootDirectory = form.serviceRootDirectory.trim();
 
     const url = mode === 'create'
       ? '/v1/workspace/services/deploy'
@@ -77,8 +82,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       ? {
         workspaceIdx: workspaceIndex,
         serviceName: form.serviceName,
-        servicePort: parseInt(form.servicePort),
+        servicePort: serviceHostPort,
+        serviceHostPort,
+        serviceContainerPort,
         serviceSourceUrl: sourceUrl,
+        ...(serviceRootDirectory && { serviceRootDirectory }),
         serviceVersion: form.serviceVersion,
         serviceDeployPreset: form.serviceDeployPreset,
         agentIndex: parseInt(form.agentIndex),
@@ -86,8 +94,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       }
       : {
         serviceName: form.serviceName,
-        servicePort: parseInt(form.servicePort),
+        servicePort: serviceHostPort,
+        serviceHostPort,
+        serviceContainerPort,
         serviceSourceUrl: sourceUrl,
+        serviceRootDirectory,
         serviceVersion: form.serviceVersion,
         serviceDeployPreset: form.serviceDeployPreset,
         agentIndex: parseInt(form.agentIndex),
@@ -155,9 +166,23 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           </div>
         </div>
         <div className="w-28 flex flex-col gap-1.5">
-          <label className={labelCls}>포트 <span className="text-service-color">*</span></label>
-          <input className={inputCls} placeholder="3000" type="number" value={form.servicePort} onChange={e => set('servicePort', e.target.value)} required />
+          <label className={labelCls}>외부 포트 <span className="text-service-color">*</span></label>
+          <input className={inputCls} placeholder="80" type="number" value={form.serviceHostPort} onChange={e => set('serviceHostPort', e.target.value)} required />
         </div>
+        <div className="w-28 flex flex-col gap-1.5">
+          <label className={labelCls}>내부 포트 <span className="text-service-color">*</span></label>
+          <input className={inputCls} placeholder="3000" type="number" value={form.serviceContainerPort} onChange={e => set('serviceContainerPort', e.target.value)} required />
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className={labelCls}>루트 디렉터리</label>
+        <input
+          className={inputCls}
+          placeholder="apps/api 또는 비워두면 레포 루트"
+          value={form.serviceRootDirectory}
+          onChange={e => set('serviceRootDirectory', e.target.value)}
+        />
       </div>
 
       <div className="flex gap-3">

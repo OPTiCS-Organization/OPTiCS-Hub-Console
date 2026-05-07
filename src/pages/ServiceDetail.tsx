@@ -138,7 +138,12 @@ export default function ServiceDetail() {
             <span className="text-secondary-text-color/40">·</span>
             <span className="text-secondary-text-color">v{service.serviceVersion}</span>
             <span className="text-secondary-text-color/40">·</span>
-            <span className="text-secondary-text-color">:{service.servicePort}</span>
+            <span className="text-secondary-text-color">
+              :{service.serviceHostPort ?? service.servicePort}
+              {(service.serviceContainerPort ?? service.servicePort) !== (service.serviceHostPort ?? service.servicePort)
+                ? ` -> :${service.serviceContainerPort ?? service.servicePort}`
+                : ''}
+            </span>
             {service.agentName && (
               <>
                 <span className="text-secondary-text-color/40">·</span>
@@ -161,6 +166,11 @@ export default function ServiceDetail() {
               </div>
             );
           })()}
+          {service.serviceRootDirectory && (
+            <div className="mt-1 text-xs text-secondary-text-color/60">
+              root: <span className="font-mono">{service.serviceRootDirectory}</span>
+            </div>
+          )}
           <div className="mt-1 flex items-center gap-3">
             <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
             <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />

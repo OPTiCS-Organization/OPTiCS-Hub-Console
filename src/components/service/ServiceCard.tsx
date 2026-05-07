@@ -45,7 +45,12 @@ export default function ServiceCard({ service }: { service: ServiceItem }) {
 
       <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
         <span className="text-secondary-text-color/60 text-[10px] font-mono">v{service.serviceVersion}</span>
-        <span className="text-secondary-text-color/60 text-[10px]">:{service.servicePort}</span>
+        <span className="text-secondary-text-color/60 text-[10px]">
+          :{service.serviceHostPort ?? service.servicePort}
+          {(service.serviceContainerPort ?? service.servicePort) !== (service.serviceHostPort ?? service.servicePort)
+            ? ` -> :${service.serviceContainerPort ?? service.servicePort}`
+            : ''}
+        </span>
       </div>
     </div>
   );
