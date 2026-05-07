@@ -6,6 +6,7 @@ export interface ServiceItem {
   serviceContainerPort?: number;
   serviceSourceUrl: string;
   serviceRootDirectory?: string | null;
+  serviceEnv?: Record<string, string>;
   serviceStatus: 'waiting' | 'building' | 'running' | 'stopped' | 'failed' | 'removed';
   serviceVersion: string;
   serviceDeployPreset: 'dockerfile' | 'compose' | 'preset_nestjs';

@@ -36,7 +36,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     agentIndex: service ? String(service.agentIndex) : '',
   });
   const [sourceUrls, setSourceUrls] = useState<string[]>(parseUrls(service?.serviceSourceUrl));
-  const [envEntries, setEnvEntries] = useState<EnvEntry[]>([]);
+  const [envEntries, setEnvEntries] = useState<EnvEntry[]>(
+    Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -102,7 +104,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         serviceVersion: form.serviceVersion,
         serviceDeployPreset: form.serviceDeployPreset,
         agentIndex: parseInt(form.agentIndex),
-        ...(Object.keys(env).length > 0 && { env }),
+        env,
       };
 
     try {
