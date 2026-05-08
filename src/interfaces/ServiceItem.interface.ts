@@ -1,3 +1,16 @@
+export interface ContainerState {
+  name: string;
+  status: 'building' | 'starting' | 'running' | 'stopped' | 'failed' | 'removed';
+  service?: string;
+  exitCode?: number | null;
+  health?: string | null;
+}
+
+export interface ContainerCounts {
+  running: number;
+  total: number;
+}
+
 export interface ServiceItem {
   serviceIndex: number;
   serviceName: string;
@@ -7,7 +20,7 @@ export interface ServiceItem {
   serviceSourceUrl: string;
   serviceRootDirectory?: string | null;
   serviceEnv?: Record<string, string>;
-  serviceStatus: 'waiting' | 'building' | 'running' | 'stopped' | 'failed' | 'removed';
+  serviceStatus: 'waiting' | 'building' | 'starting' | 'running' | 'stopped' | 'failed' | 'removed';
   serviceVersion: string;
   serviceDeployPreset: 'dockerfile' | 'compose' | 'preset_nestjs';
   serviceCreatedAt: string;
@@ -15,4 +28,5 @@ export interface ServiceItem {
   agentCode: string | null;
   agentName: string | null;
   agentUuid: string | null;
+  containers?: ContainerState[];
 }

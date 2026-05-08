@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, GitBranch, Package, Play, Square, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, GitBranch, Package, Play, Square, RefreshCw, Trash2 } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
@@ -22,10 +22,14 @@ export default function ServiceDetail() {
   const { openModal } = useModal();
   const { currentWorkspace } = useWorkspace();
 
+  const [containersExpanded, setContainersExpanded] = useState(false);
+
   const {
     logs, setLogs,
     expandedSessions, setExpandedSessions,
     currentSessionId,
+    containers,
+    containerCounts,
     logEndRef,
     onServiceStatusChangeRef,
   } = useServiceLog(service, serviceIndex, currentWorkspace?.workspaceIndex);
@@ -132,8 +136,13 @@ export default function ServiceDetail() {
             <span className="text-secondary-text-color/60 text-xs">{presetLabel[service.serviceDeployPreset]}</span>
           </div>
           <div className="flex items-center gap-3 text-xs">
-            <span className={service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : 'text-secondary-text-color'}>
+            <span className={service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : service.serviceStatus === 'starting' || service.serviceStatus === 'building' ? 'text-yellow-400' : 'text-secondary-text-color'}>
               {statusLabel[service.serviceStatus]}
+              {containerCounts && containerCounts.total > 0 && (
+                <span className="text-secondary-text-color/60 ml-0.5">
+                  ({containerCounts.running}/{containerCounts.total})
+                </span>
+              )}
             </span>
             <span className="text-secondary-text-color/40">·</span>
             <span className="text-secondary-text-color">v{service.serviceVersion}</span>
@@ -150,7 +159,42 @@ export default function ServiceDetail() {
                 <span className="text-secondary-text-color/70">{service.agentName}</span>
               </>
             )}
+            {containers.length > 0 && (
+              <button
+                onClick={() => setContainersExpanded(prev => !prev)}
+                className="flex items-center gap-0.5 text-secondary-text-color/60 hover:text-primary-text-color transition-colors cursor-pointer"
+              >
+                {containersExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              </button>
+            )}
           </div>
+          {containersExpanded && containers.length > 0 && (
+            <div className="mt-2 flex flex-col gap-1">
+              {containers.map(c => (
+                <div key={c.name} className="flex items-center gap-2 text-xs">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    c.status === 'running' ? 'bg-green-400'
+                    : c.status === 'starting' || c.status === 'building' ? 'bg-yellow-400 animate-pulse'
+                    : c.status === 'failed' ? 'bg-red-400'
+                    : 'bg-secondary-text-color/40'
+                  }`} />
+                  <span className="font-mono text-secondary-text-color/70">{c.name}</span>
+                  {c.service && c.service !== c.name && (
+                    <span className="text-secondary-text-color/40">{c.service}</span>
+                  )}
+                  <span className={
+                    c.status === 'running' ? 'text-green-400'
+                    : c.status === 'starting' || c.status === 'building' ? 'text-yellow-400'
+                    : c.status === 'failed' ? 'text-red-400'
+                    : 'text-secondary-text-color/50'
+                  }>{c.status}</span>
+                  {c.health && (
+                    <span className="text-secondary-text-color/40">health: {c.health}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
           {service.serviceSourceUrl && (() => {
             let urls: string[];
             try { const p = JSON.parse(service.serviceSourceUrl); urls = Array.isArray(p) ? p : [service.serviceSourceUrl]; }

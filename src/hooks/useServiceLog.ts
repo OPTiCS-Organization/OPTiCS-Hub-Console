@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
-import type { ServiceItem } from "../interfaces/ServiceItem.interface";
+import type { ContainerCounts, ContainerState, ServiceItem } from "../interfaces/ServiceItem.interface";
 
 export interface LogEntry {
   serviceIndex: number;
@@ -17,6 +17,8 @@ export function useServiceLog(
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [expandedSessions, setExpandedSessions] = useState<Set<number>>(new Set());
   const [currentSessionId, setCurrentSessionId] = useState<number>(0);
+  const [containers, setContainers] = useState<ContainerState[]>([]);
+  const [containerCounts, setContainerCounts] = useState<ContainerCounts | null>(null);
   const sessionIdRef = useRef<number>(0);
   const nextLogStartsNewSessionRef = useRef<boolean>(false);
   const socketRef = useRef<Socket | null>(null);
@@ -41,6 +43,14 @@ export function useServiceLog(
 
     socket.on('connect', () => {
       socket.emit('subscribe-workspace', { workspaceIndex });
+      socket.emit('command', {
+        workspaceIndex,
+        agentUuid: initial.agentUuid,
+        command: 'SYNC_CONTAINER_STATUS',
+        serviceIndex: Number(serviceIndex),
+        serviceName: initial.serviceName,
+        deployPreset: initial.serviceDeployPreset,
+      });
       socket.emit('subscribe-log', {
         workspaceIndex,
         agentUuid: initial.agentUuid,
@@ -68,6 +78,15 @@ export function useServiceLog(
       setServiceStatusRef.current?.(data.status);
     });
 
+    socket.on('container-status', (data: { serviceIndex: number; containers: ContainerState[]; counts?: ContainerCounts }) => {
+      if (data.serviceIndex !== Number(serviceIndex)) return;
+      setContainers(data.containers);
+      setContainerCounts(data.counts ?? {
+        running: data.containers.filter(container => container.status === 'running').length,
+        total: data.containers.length,
+      });
+    });
+
     return () => {
       socket.emit('unsubscribe-log', {
         workspaceIndex,
@@ -89,6 +108,8 @@ export function useServiceLog(
     expandedSessions,
     setExpandedSessions,
     currentSessionId,
+    containers,
+    containerCounts,
     logEndRef,
     onServiceStatusChangeRef: setServiceStatusRef,
   };
