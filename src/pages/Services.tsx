@@ -7,7 +7,7 @@ import { useWorkspace } from "../context/Workspace.context";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
 import { apiFetch } from "../lib/apiFetch";
-import type { ServiceItem } from "../interfaces/ServiceItem.interface";
+import type { ContainerCounts, ContainerState, ServiceItem } from "../interfaces/ServiceItem.interface";
 import ServiceCard from "../components/service/ServiceCard";
 import ServiceForm from "../components/service/ServiceForm";
 
@@ -17,6 +17,7 @@ export default function Services() {
   const { openModal } = useModal();
   const navigate = useNavigate();
   const [services, setServices] = useState<ServiceItem[]>([]);
+  const [containerCounts, setContainerCounts] = useState<Map<number, ContainerCounts>>(new Map());
   const [loading, setLoading] = useState(false);
 
   const fetchServices = useCallback(async () => {
@@ -50,6 +51,17 @@ export default function Services() {
       setServices(prev =>
         prev.map(s => s.serviceIndex === data.serviceIndex ? { ...s, serviceStatus: data.status } : s)
       );
+    });
+    socket.on('container-status', (data: { serviceIndex: number; containers: ContainerState[]; counts?: ContainerCounts }) => {
+      const counts = data.counts ?? {
+        running: data.containers.filter(container => container.status === 'running').length,
+        total: data.containers.length,
+      };
+      setContainerCounts(prev => {
+        const next = new Map(prev);
+        next.set(data.serviceIndex, counts);
+        return next;
+      });
     });
     return () => { socket.disconnect(); };
   }, [currentWorkspace, fetchServices]);
@@ -109,7 +121,7 @@ export default function Services() {
               onClick={() => navigate(`/services/${service.serviceIndex}`, { state: { service } })}
               className="cursor-pointer rounded-md border border-border-color hover:border-service-color transition-colors duration-100"
             >
-              <ServiceCard service={service} />
+              <ServiceCard service={service} containerCounts={containerCounts.get(service.serviceIndex)} />
             </div>
           ))}
         </div>

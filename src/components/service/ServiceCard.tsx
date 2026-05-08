@@ -1,8 +1,8 @@
 import { GitBranch, Package } from "lucide-react";
-import type { ServiceItem } from "../../interfaces/ServiceItem.interface";
+import type { ContainerCounts, ServiceItem } from "../../interfaces/ServiceItem.interface";
 import { statusDot, statusLabel, presetLabel } from "../../constants/service";
 
-export default function ServiceCard({ service }: { service: ServiceItem }) {
+export default function ServiceCard({ service, containerCounts }: { service: ServiceItem; containerCounts?: ContainerCounts }) {
   return (
     <div className="border border-border-color rounded-md bg-modal-box-color overflow-hidden">
       <div className="px-4 py-4 flex items-start gap-3">
@@ -18,6 +18,11 @@ export default function ServiceCard({ service }: { service: ServiceItem }) {
           <div className="flex items-center gap-1 text-[11px]">
             <span className={`font-medium ${service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : 'text-secondary-text-color'}`}>
               {statusLabel[service.serviceStatus]}
+              {service.serviceStatus === 'running' && containerCounts && containerCounts.total > 0 && (
+                <span className="text-secondary-text-color/60 ml-0.5">
+                  ({containerCounts.running}/{containerCounts.total})
+                </span>
+              )}
             </span>
             {service.agentCode && (
               <>

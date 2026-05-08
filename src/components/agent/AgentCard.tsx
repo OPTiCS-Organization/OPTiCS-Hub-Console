@@ -41,7 +41,13 @@ function formatRelative(dateStr: string) {
   return `${Math.floor(diff / 86400)}일 전`;
 }
 
-export default function AgentCard({ agent }: { agent: Agent }) {
+interface AgentCardProps {
+  agent: Agent;
+  onDisconnect?: (agent: Agent) => void;
+  onCancel?: (agent: Agent) => void;
+}
+
+export default function AgentCard({ agent, onDisconnect, onCancel }: AgentCardProps) {
   return (
     <div className="border border-border-color rounded-md bg-modal-box-color overflow-hidden">
       <div className="px-4 py-4 flex items-start gap-3">
@@ -70,9 +76,27 @@ export default function AgentCard({ agent }: { agent: Agent }) {
         <span className="text-secondary-text-color/60 text-[10px]">
           {agent.agentStatus === 'online' ? '현재 온라인' : `마지막 온라인 ${formatRelative(agent.agentLastOnline)}`}
         </span>
-        <span className="text-secondary-text-color/60 text-[10px]">
-          등록 {formatRelative(agent.agentCreatedAt)}
-        </span>
+        {agent.agentConnection === 'linked' ? (
+          <button
+            type="button"
+            onClick={() => onDisconnect?.(agent)}
+            className="text-[10px] px-2 py-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+          >
+            연결 해제
+          </button>
+        ) : agent.agentConnection === 'requested' ? (
+          <button
+            type="button"
+            onClick={() => onCancel?.(agent)}
+            className="text-[10px] px-2 py-1 rounded-sm bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors cursor-pointer"
+          >
+            요청 취소
+          </button>
+        ) : (
+          <span className="text-secondary-text-color/60 text-[10px]">
+            등록 {formatRelative(agent.agentCreatedAt)}
+          </span>
+        )}
       </div>
     </div>
   );

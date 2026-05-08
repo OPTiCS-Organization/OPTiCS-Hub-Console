@@ -35,13 +35,18 @@ export default function Agents() {
   }, [fetchAgents]);
 
   useEffect(() => {
+    if (!currentWorkspace) return;
     const socket = io(`${import.meta.env.VITE_API_URL}/console`, {
       transports: ['websocket'],
       reconnection: true,
+      withCredentials: true,
+    });
+    socket.on('connect', () => {
+      socket.emit('subscribe-workspace', { workspaceIndex: currentWorkspace.workspaceIndex });
     });
     socket.on('agent-updated', () => fetchAgents());
     return () => { socket.disconnect(); };
-  }, [fetchAgents]);
+  }, [currentWorkspace, fetchAgents]);
 
   async function handleConnect(e: { preventDefault(): void }) {
     e.preventDefault();
@@ -67,6 +72,36 @@ export default function Agents() {
       setMessage({ text: 'Network error.', ok: false });
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function handleDisconnectAgent(agent: Agent) {
+    if (!currentWorkspace) return;
+    try {
+      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/agent/${encodeURIComponent(agent.agentCode)}/disconnect`, {
+        method: 'DELETE',
+      }, logout);
+      if (!res.ok) {
+        const body = await res.json() as { message?: string };
+        setMessage({ text: body.message ?? 'Failed.', ok: false });
+      }
+    } catch {
+      setMessage({ text: 'Network error.', ok: false });
+    }
+  }
+
+  async function handleCancelAgent(agent: Agent) {
+    if (!currentWorkspace) return;
+    try {
+      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/agent/${encodeURIComponent(agent.agentCode)}/cancel`, {
+        method: 'DELETE',
+      }, logout);
+      if (!res.ok) {
+        const body = await res.json() as { message?: string };
+        setMessage({ text: body.message ?? 'Failed.', ok: false });
+      }
+    } catch {
+      setMessage({ text: 'Network error.', ok: false });
     }
   }
 
@@ -138,7 +173,12 @@ export default function Agents() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {agents.map(agent => (
-              <AgentCard key={agent.agentIndex} agent={agent} />
+              <AgentCard
+                key={agent.agentIndex}
+                agent={agent}
+                onDisconnect={handleDisconnectAgent}
+                onCancel={handleCancelAgent}
+              />
             ))}
           </div>
         )}

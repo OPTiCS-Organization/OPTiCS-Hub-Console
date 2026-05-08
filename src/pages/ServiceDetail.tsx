@@ -102,6 +102,16 @@ export default function ServiceDetail() {
     }
   }
 
+  async function handleContainerAction(containerName: string, action: 'start' | 'stop' | 'restart') {
+    if (!serviceIndex) return;
+    try {
+      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/containers/${encodeURIComponent(containerName)}/${action}`, { method: 'POST' }, logout);
+      if (!res.ok) console.log(await res.json());
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
   async function handleDeleteService() {
     if (!service || !confirm(`'${service.serviceName}' 서비스를 삭제하시겠습니까?`)) return;
     try {
@@ -171,7 +181,7 @@ export default function ServiceDetail() {
           {containersExpanded && containers.length > 0 && (
             <div className="mt-2 flex flex-col gap-1">
               {containers.map(c => (
-                <div key={c.name} className="flex items-center gap-2 text-xs">
+                <div key={c.name} className="flex items-center gap-2 text-xs w-full">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                     c.status === 'running' ? 'bg-green-400'
                     : c.status === 'starting' || c.status === 'building' ? 'bg-yellow-400 animate-pulse'
@@ -191,6 +201,17 @@ export default function ServiceDetail() {
                   {c.health && (
                     <span className="text-secondary-text-color/40">health: {c.health}</span>
                   )}
+                  <div className="ml-auto flex items-center gap-2">
+                    {(c.status === 'stopped' || c.status === 'failed') && (
+                      <Play className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'start'); }} />
+                    )}
+                    {(c.status === 'running' || c.status === 'starting') && (
+                      <Square className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'stop'); }} />
+                    )}
+                    {c.status === 'running' && (
+                      <RefreshCw className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'restart'); }} />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
