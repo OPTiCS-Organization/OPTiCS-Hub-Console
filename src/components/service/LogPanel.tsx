@@ -24,6 +24,42 @@ function markerLabel(entry: LogEntry): string {
   return `${labels[entry.markerEvent ?? ''] ?? '컨테이너 이벤트'} · ${entry.containerName ?? '-'}`;
 }
 
+function logTags(entry: LogEntry): string[] {
+  const tags: string[] = [];
+
+  if (entry.source) {
+    tags.push(entry.source);
+  }
+  if (entry.stream && entry.stream !== entry.source) {
+    tags.push(entry.stream);
+  }
+  if (tags.length < 2 && entry.composeService) tags.push(entry.composeService);
+
+  return tags.slice(0, 2);
+}
+
+function renderLogLine(entry: LogEntry, muted = false) {
+  const tags = logTags(entry);
+  const isError = entry.stderr || entry.log.startsWith('ERROR');
+  return (
+    <>
+      <span className={muted ? "text-secondary-text-color/60 shrink-0" : "text-secondary-text-color/40 shrink-0"}>
+        {formatTimestamp(entry.timestamp)}
+      </span>
+      {tags.length > 0 && (
+        <span className="flex gap-1 shrink-0">
+          {tags.map(tag => (
+            <span key={tag} className="px-1 py-px rounded border border-border-color text-secondary-text-color/60 text-[9px] leading-4">
+              {tag}
+            </span>
+          ))}
+        </span>
+      )}
+      <span className={isError ? 'text-red-400' : 'text-primary-text-color'}>{entry.log}</span>
+    </>
+  );
+}
+
 interface LogPanelProps {
   logs: LogEntry[];
   currentSessionId: number;
@@ -53,14 +89,22 @@ export default function LogPanel({
   const isLoadingHistory = logLoadProgress?.phase === 'loading' && logLoadProgress.percent < 100;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const previousScrollHeightRef = useRef<number | null>(null);
+  const shouldStickToBottomRef = useRef(true);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
     const previousScrollHeight = previousScrollHeightRef.current;
-    if (!container || previousScrollHeight === null) return;
+    if (!container) return;
 
-    container.scrollTop = container.scrollHeight - previousScrollHeight;
-    previousScrollHeightRef.current = null;
+    if (previousScrollHeight !== null) {
+      container.scrollTop = container.scrollHeight - previousScrollHeight;
+      previousScrollHeightRef.current = null;
+      return;
+    }
+
+    if (shouldStickToBottomRef.current) {
+      container.scrollTop = container.scrollHeight;
+    }
   }, [logs.length]);
 
   useLayoutEffect(() => {
@@ -71,7 +115,12 @@ export default function LogPanel({
 
   const handleScroll = () => {
     const container = scrollRef.current;
-    if (!container || isLoadingOlderLogs || !hasOlderLogs || logs.length === 0) return;
+    if (!container) return;
+
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 40;
+
+    if (isLoadingOlderLogs || !hasOlderLogs || logs.length === 0) return;
     if (container.scrollTop > 12) return;
 
     previousScrollHeightRef.current = container.scrollHeight;
@@ -141,12 +190,7 @@ export default function LogPanel({
                           <span className="h-px bg-border-color flex-1" />
                         </div>
                       )
-                      : (
-                        <div key={i} className="flex gap-2 opacity-40">
-                          <span className="text-secondary-text-color/60 shrink-0">{formatTimestamp(entry.timestamp)}</span>
-                          <span className={entry.log.startsWith('ERROR') ? 'text-red-400' : 'text-primary-text-color'}>{entry.log}</span>
-                        </div>
-                      )
+                      : <div key={i} className="flex gap-2 opacity-40">{renderLogLine(entry, true)}</div>
                   ))}
                 </div>
               );
@@ -162,12 +206,7 @@ export default function LogPanel({
                     <span className="h-px bg-border-color flex-1" />
                   </div>
                 )
-                : (
-                  <div key={`${sid}-${i}`} className="flex gap-2">
-                    <span className="text-secondary-text-color/40 shrink-0">{formatTimestamp(entry.timestamp)}</span>
-                    <span className={entry.log.startsWith('ERROR') ? 'text-red-400' : 'text-primary-text-color'}>{entry.log}</span>
-                  </div>
-                )
+                : <div key={`${sid}-${i}`} className="flex gap-2">{renderLogLine(entry)}</div>
             ));
           })
         }

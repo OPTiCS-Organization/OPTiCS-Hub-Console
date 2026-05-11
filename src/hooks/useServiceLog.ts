@@ -10,6 +10,10 @@ export interface LogEntry {
   type?: 'log' | 'marker';
   markerEvent?: string;
   containerName?: string;
+  source?: 'hub' | 'agent' | 'runtime';
+  stream?: 'deploy' | 'lifecycle' | 'runtime';
+  composeService?: string;
+  stderr?: boolean;
 }
 
 export interface LogLoadProgress {
@@ -22,7 +26,15 @@ export interface LogLoadProgress {
 
 interface LogHistoryPayload {
   serviceIndex: number;
-  logs: { line: string; timestamp?: string }[];
+  logs: {
+    line: string;
+    timestamp?: string;
+    source?: 'hub' | 'agent' | 'runtime';
+    stream?: 'deploy' | 'lifecycle' | 'runtime';
+    containerName?: string;
+    composeService?: string;
+    stderr?: boolean;
+  }[];
   markers?: LogSessionMarker[];
   before?: string;
   hasMore?: boolean;
@@ -53,7 +65,7 @@ function mergeLogs(current: LogEntry[], incoming: LogEntry[]): LogEntry[] {
   const merged = new Map<string, LogEntry>();
 
   [...current, ...incoming].forEach((entry) => {
-    merged.set(`${entry.type ?? 'log'}:${entry.timestamp}:${entry.containerName ?? ''}:${entry.markerEvent ?? ''}:${entry.log}`, entry);
+    merged.set(`${entry.type ?? 'log'}:${entry.timestamp}:${entry.source ?? ''}:${entry.stream ?? ''}:${entry.containerName ?? ''}:${entry.composeService ?? ''}:${entry.markerEvent ?? ''}:${entry.log}`, entry);
   });
 
   return assignLogSessions(
@@ -113,11 +125,26 @@ export function useServiceLog(
   const isPrependingLogsRef = useRef<boolean>(false);
   const socketRef = useRef<Socket | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
+  const lastLogSubscribeAtRef = useRef<number>(0);
 
   const serviceRef = useRef<ServiceItem | null>(service);
   useEffect(() => { serviceRef.current = service; }, [service]);
 
   const setServiceStatusRef = useRef<((status: ServiceItem['serviceStatus']) => void) | null>(null);
+
+  const subscribeLog = useCallback((socket: Socket, initial: ServiceItem, currentWorkspaceIndex: number) => {
+    const now = Date.now();
+    if (now - lastLogSubscribeAtRef.current < 1000) return;
+    lastLogSubscribeAtRef.current = now;
+
+    socket.emit('subscribe-log', {
+      workspaceIndex: currentWorkspaceIndex,
+      agentUuid: initial.agentUuid,
+      serviceIndex: Number(serviceIndex),
+      serviceName: initial.serviceName,
+      deployPreset: initial.serviceDeployPreset,
+    });
+  }, [serviceIndex]);
 
   useEffect(() => {
     if (!service || !serviceIndex || !workspaceIndex || !service.agentUuid) return;
@@ -140,13 +167,7 @@ export function useServiceLog(
         serviceName: initial.serviceName,
         deployPreset: initial.serviceDeployPreset,
       });
-      socket.emit('subscribe-log', {
-        workspaceIndex,
-        agentUuid: initial.agentUuid,
-        serviceIndex: Number(serviceIndex),
-        serviceName: initial.serviceName,
-        deployPreset: initial.serviceDeployPreset,
-      });
+      subscribeLog(socket, initial, workspaceIndex);
     });
 
     socket.on('service-log', (data: Omit<LogEntry, 'sessionId'>) => {
@@ -162,6 +183,11 @@ export function useServiceLog(
         timestamp: entry.timestamp ?? data.before ?? new Date().toISOString(),
         sessionId: sessionIdRef.current,
         type: 'log',
+        source: entry.source,
+        stream: entry.stream,
+        containerName: entry.containerName,
+        composeService: entry.composeService,
+        stderr: entry.stderr,
       }));
       const markerLogs = (data.markers ?? []).filter(marker => SERVICE_SESSION_MARKER_EVENTS.has(marker.event)).map(markerToLogEntry);
       setLogs(prev => mergeLogs(prev, [...historyLogs, ...markerLogs]));
@@ -183,6 +209,9 @@ export function useServiceLog(
     socket.on('service-status', (data: { serviceIndex: number; status: ServiceItem['serviceStatus'] }) => {
       if (data.serviceIndex !== Number(serviceIndex)) return;
       setServiceStatusRef.current?.(data.status);
+      if (data.status === 'running') {
+        subscribeLog(socket, initial, workspaceIndex);
+      }
     });
 
     socket.on('container-status', (data: { serviceIndex: number; containers: ContainerState[]; counts?: ContainerCounts }) => {
@@ -203,13 +232,7 @@ export function useServiceLog(
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [serviceIndex, workspaceIndex, service?.agentUuid, service?.serviceName, service?.serviceDeployPreset]);
-
-  useEffect(() => {
-    if (!isPrependingLogsRef.current) {
-      logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [logs]);
+  }, [serviceIndex, workspaceIndex, service?.agentUuid, service?.serviceName, service?.serviceDeployPreset, subscribeLog]);
 
   useEffect(() => {
     const maxSessionId = logs.reduce((max, entry) => Math.max(max, entry.sessionId), 0);

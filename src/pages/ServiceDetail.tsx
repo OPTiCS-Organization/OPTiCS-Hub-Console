@@ -87,6 +87,7 @@ export default function ServiceDetail() {
       </div>
     );
   }
+  const isRemoved = service.serviceStatus === 'removed';
 
   async function handleStartService() {
     try {
@@ -245,13 +246,13 @@ export default function ServiceDetail() {
                     <span className="text-secondary-text-color/40">health: {c.health}</span>
                   )}
                   <div className="ml-auto flex items-center gap-2">
-                    {(c.status === 'stopped' || c.status === 'failed') && (
+                    {!isRemoved && (c.status === 'stopped' || c.status === 'failed') && (
                       <Play className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'start'); }} />
                     )}
-                    {(c.status === 'running' || c.status === 'starting') && (
+                    {!isRemoved && (c.status === 'running' || c.status === 'starting') && (
                       <Square className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'stop'); }} />
                     )}
-                    {c.status === 'running' && (
+                    {!isRemoved && c.status === 'running' && (
                       <RefreshCw className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'restart'); }} />
                     )}
                   </div>
@@ -280,8 +281,12 @@ export default function ServiceDetail() {
             </div>
           )}
           <div className="mt-1 flex items-center gap-3">
-            <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
-            <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />
+            {!isRemoved && (
+              <>
+                <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
+                <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />
+              </>
+            )}
             <RefreshCw
               className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors"
               onClick={() => {
