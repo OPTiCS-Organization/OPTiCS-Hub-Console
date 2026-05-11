@@ -47,9 +47,9 @@ function renderLogLine(entry: LogEntry, muted = false) {
         {formatTimestamp(entry.timestamp)}
       </span>
       {tags.length > 0 && (
-        <span className="flex gap-1 shrink-0">
+        <span className="flex gap-1 shrink-0 self-start">
           {tags.map(tag => (
-            <span key={tag} className="px-1 py-px rounded border border-border-color text-secondary-text-color/60 text-[9px] leading-4">
+            <span key={tag} className="inline-flex h-4 items-center px-1 rounded border border-border-color text-secondary-text-color/60 text-[9px] leading-none">
               {tag}
             </span>
           ))}
