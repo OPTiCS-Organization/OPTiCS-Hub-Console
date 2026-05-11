@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, RefreshCw, Plus } from "lucide-react";
-import { io } from "socket.io-client";
+import { io, Socket } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 
 import { useWorkspace } from "../context/Workspace.context";
@@ -19,6 +19,27 @@ export default function Services() {
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [containerCounts, setContainerCounts] = useState<Map<number, ContainerCounts>>(new Map());
   const [loading, setLoading] = useState(false);
+  const servicesRef = useRef<ServiceItem[]>([]);
+  const socketRef = useRef<Socket | null>(null);
+
+  useEffect(() => {
+    servicesRef.current = services;
+  }, [services]);
+
+  const syncContainerStatus = useCallback((targetServices: ServiceItem[] = servicesRef.current) => {
+    if (!currentWorkspace || !socketRef.current) return;
+    targetServices.forEach(service => {
+      if (!service.agentUuid) return;
+      socketRef.current?.emit('command', {
+        workspaceIndex: currentWorkspace.workspaceIndex,
+        agentUuid: service.agentUuid,
+        command: 'SYNC_CONTAINER_STATUS',
+        serviceIndex: service.serviceIndex,
+        serviceName: service.serviceName,
+        deployPreset: service.serviceDeployPreset,
+      });
+    });
+  }, [currentWorkspace]);
 
   const fetchServices = useCallback(async () => {
     if (!currentWorkspace) return;
@@ -26,13 +47,15 @@ export default function Services() {
     try {
       const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/services`, {}, logout);
       const body = await res.json() as { data: { services: ServiceItem[] } };
-      setServices(body.data.services);
+      const nextServices = body.data.services;
+      setServices(nextServices);
+      syncContainerStatus(nextServices);
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [currentWorkspace, logout]);
+  }, [currentWorkspace, logout, syncContainerStatus]);
 
   useEffect(() => { fetchServices(); }, [fetchServices]);
 
@@ -43,8 +66,10 @@ export default function Services() {
       reconnection: true,
       withCredentials: true,
     });
+    socketRef.current = socket;
     socket.on('connect', () => {
       socket.emit('subscribe-workspace', { workspaceIndex: currentWorkspace.workspaceIndex });
+      syncContainerStatus();
     });
     socket.on('agent-updated', () => { void fetchServices(); });
     socket.on('service-status', (data: { serviceIndex: number; status: ServiceItem['serviceStatus'] }) => {
@@ -63,8 +88,11 @@ export default function Services() {
         return next;
       });
     });
-    return () => { socket.disconnect(); };
-  }, [currentWorkspace, fetchServices]);
+    return () => {
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [currentWorkspace, fetchServices, syncContainerStatus]);
 
   function openCreateModal() {
     if (!currentWorkspace) return;

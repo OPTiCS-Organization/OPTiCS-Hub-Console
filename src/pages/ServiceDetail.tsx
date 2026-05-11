@@ -19,7 +19,7 @@ export default function ServiceDetail() {
   const [service, setService] = useState<ServiceItem | null>(state?.service ?? null);
   const [serviceLoading, setServiceLoading] = useState(!state?.service);
   const { logout } = useAuth();
-  const { openModal } = useModal();
+  const { openModal, closeModal } = useModal();
   const { currentWorkspace } = useWorkspace();
 
   const [containersExpanded, setContainersExpanded] = useState(false);
@@ -30,6 +30,10 @@ export default function ServiceDetail() {
     currentSessionId,
     containers,
     containerCounts,
+    logLoadProgress,
+    isLoadingOlderLogs,
+    hasOlderLogs,
+    loadOlderLogs,
     logEndRef,
     onServiceStatusChangeRef,
   } = useServiceLog(service, serviceIndex, currentWorkspace?.workspaceIndex);
@@ -112,15 +116,54 @@ export default function ServiceDetail() {
     }
   }
 
-  async function handleDeleteService() {
-    if (!service || !confirm(`'${service.serviceName}' 서비스를 삭제하시겠습니까?`)) return;
+  async function deleteService(deleteScope: 'containers' | 'service') {
+    if (!service) return;
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}`, { method: 'DELETE' }, logout);
-      if (res.ok) navigate('/services');
+      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteScope }),
+      }, logout);
+      if (res.ok) {
+        closeModal();
+        if (deleteScope === 'service') navigate('/services');
+        else void fetchService();
+      }
       else console.log(await res.json());
     } catch (error) {
       console.log(error);
     }
+  }
+
+  function handleDeleteService() {
+    if (!service) return;
+    openModal('서비스 삭제', (
+      <div className="space-y-4">
+        <p className="text-xs text-secondary-text-color">
+          '{service.serviceName}' 삭제 범위를 선택하세요.
+        </p>
+        <div className="space-y-2">
+          <button
+            onClick={() => { void deleteService('containers'); }}
+            className="w-full text-left rounded-md border border-border-color px-3 py-2.5 hover:border-service-color transition-colors cursor-pointer"
+          >
+            <span className="block text-xs font-semibold text-primary-text-color">컨테이너만 삭제</span>
+            <span className="block text-[10px] text-secondary-text-color mt-1">
+              Hub 서비스 정보는 유지하고 실행 컨테이너, 이미지, 볼륨, Agent 로그 세션 마커를 삭제합니다.
+            </span>
+          </button>
+          <button
+            onClick={() => { void deleteService('service'); }}
+            className="w-full text-left rounded-md border border-red-500/40 px-3 py-2.5 hover:border-red-400 transition-colors cursor-pointer"
+          >
+            <span className="block text-xs font-semibold text-red-400">서비스 전체 삭제</span>
+            <span className="block text-[10px] text-secondary-text-color mt-1">
+              컨테이너와 Agent 로컬 데이터를 삭제하고 Hub 서비스 목록에서도 제거합니다.
+            </span>
+          </button>
+        </div>
+      </div>
+    ));
   }
 
   return (
@@ -259,6 +302,10 @@ export default function ServiceDetail() {
         setExpandedSessions={setExpandedSessions}
         onClear={() => setLogs([])}
         logEndRef={logEndRef}
+        logLoadProgress={logLoadProgress}
+        isLoadingOlderLogs={isLoadingOlderLogs}
+        hasOlderLogs={hasOlderLogs}
+        onLoadOlder={loadOlderLogs}
       />
 
     </div>
