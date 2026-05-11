@@ -128,7 +128,7 @@ export default function LogPanel({
   };
 
   return (
-    <div className="border border-border-color rounded-md bg-modal-box-color flex flex-col" style={{ height: 'calc(100vh - 320px)', minHeight: '300px' }}>
+    <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-md border border-border-color bg-modal-box-color">
       <div className="px-4 py-2.5 border-b border-border-color flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-3.5 h-3.5 text-secondary-text-color" />

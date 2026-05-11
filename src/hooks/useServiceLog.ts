@@ -123,6 +123,8 @@ export function useServiceLog(
   const [hasOlderLogs, setHasOlderLogs] = useState(true);
   const sessionIdRef = useRef<number>(0);
   const isPrependingLogsRef = useRef<boolean>(false);
+  const loadingOlderLogsRef = useRef<boolean>(false);
+  const lastOlderBeforeRef = useRef<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const logEndRef = useRef<HTMLDivElement>(null);
   const lastLogSubscribeAtRef = useRef<number>(0);
@@ -193,6 +195,7 @@ export function useServiceLog(
       setLogs(prev => mergeLogs(prev, [...historyLogs, ...markerLogs]));
       setHasOlderLogs(data.hasMore ?? historyLogs.length > 0);
       setIsLoadingOlderLogs(false);
+      loadingOlderLogsRef.current = false;
       isPrependingLogsRef.current = false;
     });
 
@@ -231,6 +234,8 @@ export function useServiceLog(
       });
       socket.disconnect();
       socketRef.current = null;
+      loadingOlderLogsRef.current = false;
+      lastOlderBeforeRef.current = null;
     };
   }, [serviceIndex, workspaceIndex, service?.agentUuid, service?.serviceName, service?.serviceDeployPreset, subscribeLog]);
 
@@ -244,11 +249,14 @@ export function useServiceLog(
     const initial = serviceRef.current;
     const socket = socketRef.current;
     if (!initial || !serviceIndex || !workspaceIndex || !initial.agentUuid || !socket) return;
-    if (isLoadingOlderLogs || !hasOlderLogs || logs.length === 0) return;
+    if (loadingOlderLogsRef.current || isLoadingOlderLogs || !hasOlderLogs || logs.length === 0) return;
 
     const before = earliestTimestamp(logs);
     if (!before) return;
+    if (lastOlderBeforeRef.current === before) return;
 
+    loadingOlderLogsRef.current = true;
+    lastOlderBeforeRef.current = before;
     isPrependingLogsRef.current = true;
     setIsLoadingOlderLogs(true);
     socket.emit('command', {

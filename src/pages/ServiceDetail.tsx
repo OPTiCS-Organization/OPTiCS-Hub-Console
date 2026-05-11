@@ -168,18 +168,18 @@ export default function ServiceDetail() {
   }
 
   return (
-    <div className="text-primary-text-color mt-20">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden pt-20 text-primary-text-color">
 
       {/* 헤더 */}
       <button
         onClick={() => navigate('/services')}
-        className="flex items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer mb-6"
+        className="mb-4 flex w-fit shrink-0 items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
       >
         <ArrowLeft className="w-3 h-3" />
         목록으로
       </button>
 
-      <div className="flex items-start gap-4 mb-6">
+      <div className="mb-4 flex shrink-0 items-start gap-4">
         <div className="relative w-10 h-10 rounded-md bg-modal-box-color border border-border-color flex items-center justify-center shrink-0">
           <Package className="w-5 h-5 text-secondary-text-color" />
           <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background-color ${statusDot[service.serviceStatus]}`} />
