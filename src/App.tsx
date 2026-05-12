@@ -18,7 +18,7 @@ function AppLayout() {
   return (
     <div className="min-h-screen bg-background-color flex">
       <Navigation />
-      <main className="ml-56 flex h-screen min-h-0 flex-1 flex-col overflow-y-auto p-8">
+      <main className="ml-56 mr-70 flex h-screen min-h-0 flex-1 flex-col overflow-y-auto p-8">
         <Routes>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/overview" element={<Overview />} />
