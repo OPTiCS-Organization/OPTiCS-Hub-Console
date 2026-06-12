@@ -14,6 +14,30 @@ export default function Settings() {
           type={SettingType.Button_Danger}
           onClick={logout}
         />
+        <SettingOption
+          settingName="Change password"
+          description="Change to new password."
+          type={SettingType.Button} 
+        />
+      </Section>
+      <Section sectionName="Preferences">
+        <SettingOption
+          settingName="Dark Mode"
+          description="Enable dark mode."
+          type={SettingType.Toggle}
+        />
+      </Section>
+      <Section sectionName="Notifications">
+        <SettingOption
+          settingName="On agent fail"
+          description="Notify on agent get exception."
+          type={SettingType.Toggle}
+        />
+        <SettingOption
+          settingName="On agent disconnect"
+          description="Notify on agent turns into offline."
+          type={SettingType.Toggle}
+        />
       </Section>
     </div>
   )

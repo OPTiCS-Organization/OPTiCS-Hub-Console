@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 
+// eslint-disable-next-line react-refresh/only-export-components
 export enum SettingType {
   Button = 'Button',
   Toggle = 'Toggle',
@@ -7,9 +8,9 @@ export enum SettingType {
 }
 
 function ActionButton({ label, onClick, danger }: { label: string; onClick?: () => void; danger?: boolean }) {
-  const variant = danger ? "bg-red-600 hover:bg-red-700" : "bg-service-color hover:bg-button-progress-color";
+  const variant = danger ? "hover:bg-red-700 border border-red-700" : "bg-service-color hover:bg-button-progress-color";
   return (
-    <button type="button" onClick={onClick} className={`text-white text-sm font-semibold px-4 py-1.5 rounded-sm cursor-pointer transition-colors duration-100 ${variant}`}>
+    <button type="button" onClick={onClick} className={`text-white text-sm font-semibold px-4 pt-1.5 pb-2.5 rounded-sm cursor-pointer transition-colors duration-100 ${variant}`}>
       {label}
     </button>
   );
@@ -57,7 +58,7 @@ export function SettingOption({ settingName, description = "", type, buttonLabel
       break;
   }
   return (
-    <div className="grid-cols-[2fr_1fr] grid-rows-2 grid">
+    <div className="mt-5 grid-cols-[2fr_1fr] grid-rows-2 grid">
       <span className="col-span-1 text-md font-semibold">{settingName}</span>
       <div className="col-span-1 row-span-2 justify-end flex items-center">
         {typeNode}
