@@ -21,6 +21,7 @@ export interface ServiceItem {
   serviceRootDirectory?: string | null;
   serviceEnv?: Record<string, string>;
   serviceStatus: 'waiting' | 'building' | 'starting' | 'running' | 'stopped' | 'failed' | 'removed';
+  serviceSubdomain?: string | null;
   serviceVersion: string;
   serviceDeployPreset: 'dockerfile' | 'compose' | 'preset_nestjs';
   serviceCreatedAt: string;

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, ChevronDown, ChevronRight, GitBranch, Package, Play, Square, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, ChevronRight, GitBranch, Globe, Package, Pencil, Play, Square, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
@@ -23,6 +23,10 @@ export default function ServiceDetail() {
   const { currentWorkspace } = useWorkspace();
 
   const [containersExpanded, setContainersExpanded] = useState(false);
+
+  const [subdomainEditing, setSubdomainEditing] = useState(false);
+  const [subdomainInput, setSubdomainInput] = useState('');
+  const [subdomainError, setSubdomainError] = useState<string | null>(null);
 
   const {
     logs, setLogs,
@@ -114,6 +118,31 @@ export default function ServiceDetail() {
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
+    }
+  }
+
+  async function handleSaveSubdomain() {
+    const value = subdomainInput.trim();
+    if (value !== '' && (value.length > 63 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value))) {
+      setSubdomainError('소문자/숫자/하이픈만 사용할 수 있습니다.');
+      return;
+    }
+    try {
+      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/subdomain`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subdomain: value === '' ? null : value }),
+      }, logout);
+      if (!res.ok) {
+        setSubdomainError(res.status === 409 ? '이미 사용 중인 서브도메인입니다.' : '저장에 실패했습니다.');
+        return;
+      }
+      setService(prev => prev ? { ...prev, serviceSubdomain: value === '' ? null : value } : prev);
+      setSubdomainEditing(false);
+      setSubdomainError(null);
+    } catch (error) {
+      console.log(error);
+      setSubdomainError('저장에 실패했습니다.');
     }
   }
 
@@ -280,6 +309,37 @@ export default function ServiceDetail() {
               root: <span className="font-mono">{service.serviceRootDirectory}</span>
             </div>
           )}
+          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary-text-color/60">
+            <Globe className="w-3 h-3 shrink-0" />
+            {subdomainEditing ? (
+              <>
+                <input
+                  value={subdomainInput}
+                  onChange={e => { setSubdomainInput(e.target.value); setSubdomainError(null); }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') void handleSaveSubdomain();
+                    if (e.key === 'Escape') { setSubdomainEditing(false); setSubdomainError(null); }
+                  }}
+                  placeholder="subdomain"
+                  autoFocus
+                  className="w-40 rounded border border-border-color bg-transparent px-1.5 py-0.5 font-mono text-xs text-primary-text-color outline-none focus:border-service-color"
+                />
+                <Check className="w-3 h-3 cursor-pointer hover:text-green-400 transition-colors" onClick={() => { void handleSaveSubdomain(); }} />
+                <X className="w-3 h-3 cursor-pointer hover:text-red-400 transition-colors" onClick={() => { setSubdomainEditing(false); setSubdomainError(null); }} />
+              </>
+            ) : (
+              <>
+                <span className="font-mono">{service.serviceSubdomain ?? '서브도메인 미설정'}</span>
+                {!isRemoved && (
+                  <Pencil
+                    className="w-3 h-3 cursor-pointer hover:text-primary-text-color transition-colors"
+                    onClick={() => { setSubdomainInput(service.serviceSubdomain ?? ''); setSubdomainEditing(true); }}
+                  />
+                )}
+              </>
+            )}
+            {subdomainError && <span className="text-red-400">{subdomainError}</span>}
+          </div>
           <div className="mt-1 flex items-center gap-3">
             {!isRemoved && (
               <>
