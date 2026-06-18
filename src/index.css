@@ -1,14 +1,39 @@
 @import "tailwindcss";
 
 @theme {
+  /* 브랜드 / 액센트 */
   --color-service-color: #fd7a28;
-  --color-background-color: #1A1410;
-  --color-background-gradation-color: #221105;
-  --color-modal-background-color: #2A2218;
-  --color-shadow-color: #22110060;
-  --color-border-color: #4A3F34;
-  --color-modal-box-color: #3A2F24;
-  --color-primary-text-color: #E0E0E0;
-  --color-secondary-text-color: #A0A0A0;
-  --color-button-progress-color: #c85f1f;
+  /* 액센트 기본 (텍스트·아이콘·차트) */
+  --color-button-hover-color: #ff8c42;
+  /* 액센트 hover (밝게) */
+  --color-button-progress-color: #d9661c;
+  /* 액센트 active/채움 배경 */
+  --color-on-accent-color: #fff4ec;
+  /* 채움 주황 위 글자 (검정 대신) */
+
+  /* 배경 레이어 (어두움 → 밝음) */
+  --color-background-gradation-color: #151210;
+  /* 최하단 / 사이드바 */
+  --color-background-color: #1a1715;
+  /* 기본 베이스 */
+  --color-modal-background-color: #232020;
+  /* 카드 / 서피스 */
+  --color-modal-box-color: #2b2826;
+  /* elevated (카드 위 카드) */
+
+  /* 보더 / 그림자 */
+  --color-border-color: #393431;
+  --color-border-strong-color: #4a443f;
+  /* hover 시 강조 */
+  --color-shadow-color: #0d0a0866;
+
+  /* 텍스트 (검정 없음, 전부 밝은 톤) */
+  --color-primary-text-color: #eae7e4;
+  --color-secondary-text-color: #aaa4a0;
+  --color-tertiary-text-color: #75706c;
+
+  /* 상태색 (저채도, 액센트와 비충돌) */
+  --color-success-color: #6db98f;
+  --color-warning-color: #e8c468;
+  --color-danger-color: #e0726a;
 }
