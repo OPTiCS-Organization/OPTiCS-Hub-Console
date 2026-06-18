@@ -27,8 +27,8 @@ export default function CreateWorkspaceModal() {
 
   function getFormatError(value: string): string | null {
     if (value.length === 0) return null;
-    if (value.length > 50) return "Must be 50 characters or fewer.";
-    if (!NAME_REGEX.test(value)) return "Only letters, numbers, hyphens(-), and underscores(_) are allowed.";
+    if (value.length > 50) return "워크스페이스 이름의 길이는 50자 이내여야 합니다.";
+    if (!NAME_REGEX.test(value)) return "워크스페이스 이름에는 알파벳, 숫자, 하이픈(-), 언더스코어(_)만 사용할 수 있습니다.";
     return null;
   }
 
@@ -68,10 +68,10 @@ export default function CreateWorkspaceModal() {
         const json = await res.json() as { data: { valid: boolean } };
         if (json.data?.valid) {
           setNameStatus("valid");
-          setNameMessage("This name is available.");
+          setNameMessage("이 워크스페이스 이름은 사용 가능합니다.");
         } else {
           setNameStatus("invalid");
-          setNameMessage("This workspace name is already in use.");
+          setNameMessage("이 워크스페이스 이름은 이미 사용 중입니다.");
         }
       } catch {
         setNameStatus("idle");
@@ -92,7 +92,7 @@ export default function CreateWorkspaceModal() {
       await createWorkspace(trimmed);
       closeModal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unknown error has occurred.");
+      setError(err instanceof Error ? err.message : "죄송합니다. 알 수 없는 에러가 발생했습니다.");
     } finally {
       setIsSubmitting(false);
     }
@@ -107,7 +107,7 @@ export default function CreateWorkspaceModal() {
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {/* Name */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs text-secondary-text-color font-medium uppercase tracking-widest">Workspace Name <span className="text-service-color">*</span>
+        <label className="text-xs text-secondary-text-color font-medium uppercase tracking-widest">워크스페이스 이름 <span className="text-service-color">*</span>
         </label>
         <input
           type="text"
@@ -130,12 +130,12 @@ export default function CreateWorkspaceModal() {
 
       {/* Description */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs text-secondary-text-color font-medium uppercase tracking-widest">Description <span className="text-secondary-text-color/50 normal-case tracking-normal font-normal">(Optional)</span>
+        <label className="text-xs text-secondary-text-color font-medium uppercase tracking-widest">설명 <span className="text-secondary-text-color/50 normal-case tracking-normal font-normal">(Optional)</span>
         </label>
         <textarea
           value={description}
           onChange={e => setDescription(e.target.value)}
-          placeholder="Enter description about this workspace..."
+          placeholder="이 워크스페이스에 대한 설명을 입력하세요..."
           maxLength={200}
           rows={3}
           className="w-full rounded-sm bg-modal-box-color border border-border-color px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none focus:border-service-color transition-colors duration-100 resize-none"
@@ -158,7 +158,7 @@ export default function CreateWorkspaceModal() {
           disabled={isSubmitting}
           className="px-4 py-1.5 rounded-sm text-sm text-secondary-text-color hover:text-primary-text-color border border-border-color hover:border-border-color/80 hover:bg-white/5 transition-colors duration-100 cursor-pointer disabled:opacity-50"
         >
-          Cancel
+          취소
         </button>
         <button
           type="submit"
@@ -166,7 +166,7 @@ export default function CreateWorkspaceModal() {
           className="flex items-center gap-2 px-4 py-1.5 rounded-sm text-sm font-semibold bg-service-color hover:bg-button-progress-color text-white transition-colors duration-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          Create
+          생성
         </button>
       </div>
     </form>
