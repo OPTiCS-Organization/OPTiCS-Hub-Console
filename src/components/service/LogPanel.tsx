@@ -1,6 +1,13 @@
-import { useLayoutEffect, useRef } from "react";
-import { Terminal } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Check, Loader2, Terminal } from "lucide-react";
 import type { LogEntry, LogLoadProgress } from "../../hooks/useServiceLog";
+
+// 현재 세션에서 한 번에 DOM에 그릴 최대 줄 수. 나머지는 "더보기"로 숨겨 초기 렌더 부하를 막는다.
+const CURRENT_SESSION_RENDER_LIMIT = 1500;
+const CURRENT_SESSION_RENDER_STEP = 3000;
+
+// 우측 하단 안내 배지: 로딩 완료('loaded')는 현재 렌더 수, 더보기('shown')는 추가로 드러난 수를 보여준다.
+type ToastState = { mode: 'loaded' } | { mode: 'shown'; added: number };
 
 function formatTimestamp(timestamp: string): string {
   const d = new Date(timestamp);
@@ -86,10 +93,46 @@ export default function LogPanel({
   onLoadOlder,
 }: LogPanelProps) {
   const sessions = Array.from(new Set(logs.map(e => e.sessionId))).sort((a, b) => a - b);
+  // progress 이벤트가 오기 전(에이전트가 docker logs를 읽어 전체 크기를 재는 구간) → 측정 중
+  const isMeasuring = !logLoadProgress;
   const isLoadingHistory = logLoadProgress?.phase === 'loading' && logLoadProgress.percent < 100;
+  const loadingLabel = isMeasuring
+    ? '로그 크기 측정 중...'
+    : isLoadingHistory
+      ? `로그 불러오는 중... ${logLoadProgress.percent}% (${logLoadProgress.loaded.toLocaleString()}/${logLoadProgress.total.toLocaleString()})`
+      : null;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const previousScrollHeightRef = useRef<number | null>(null);
   const shouldStickToBottomRef = useRef(true);
+  const [currentVisibleCount, setCurrentVisibleCount] = useState(CURRENT_SESSION_RENDER_LIMIT);
+
+  // 실제로 DOM에 렌더되는 로그(마커 제외) 수: 접힌 과거 세션은 제외하고, 현재 세션은 상한까지만 센다.
+  const renderedLogCount = sessions.reduce((total, sid) => {
+    const sessionLogs = logs.filter(entry => entry.sessionId === sid);
+    const isCurrent = sid === currentSessionId;
+    if (!isCurrent && !expandedSessions.has(sid)) return total;
+    const visible = isCurrent && sessionLogs.length > currentVisibleCount
+      ? sessionLogs.slice(-currentVisibleCount)
+      : sessionLogs;
+    return total + visible.reduce((n, entry) => entry.type === 'marker' ? n : n + 1, 0);
+  }, 0);
+
+  // 토스트: 로딩 완료 직후('loaded')나 더보기 클릭('shown') 시 잠깐 떴다가 5초 뒤 사라진다.
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const wasLoadingRef = useRef(false);
+
+  useEffect(() => {
+    const loadingNow = isMeasuring || isLoadingHistory;
+    if (wasLoadingRef.current && !loadingNow) setToast({ mode: 'loaded' });
+    wasLoadingRef.current = loadingNow;
+  }, [isMeasuring, isLoadingHistory]);
+
+  // toast가 새 객체로 갱신될 때마다(완료/더보기) 5초 타이머를 재시작한다.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   useLayoutEffect(() => {
     const container = scrollRef.current;
@@ -128,19 +171,15 @@ export default function LogPanel({
   };
 
   return (
-    <div className="flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-md border border-border-color bg-modal-box-color">
+    <div className="relative flex min-h-[300px] flex-1 flex-col overflow-hidden rounded-md border border-border-color bg-modal-box-color">
       <div className="px-4 py-2.5 border-b border-border-color flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <Terminal className="w-3.5 h-3.5 text-secondary-text-color" />
           <span className="text-xs font-semibold text-primary-text-color">로그</span>
           <span className="w-1.5 h-1.5 rounded-full bg-service-color animate-pulse" />
-          {logLoadProgress && (
-            <span className="text-[10px] text-secondary-text-color/60">
-              {isLoadingHistory
-                ? `불러오는 중 ${logLoadProgress.percent}% (${logLoadProgress.loaded}/${logLoadProgress.total})`
-                : 'Streaming'}
-            </span>
-          )}
+          <span className="text-[10px] text-secondary-text-color/60">
+            {isMeasuring ? '크기 측정 중...' : isLoadingHistory ? `불러오는 중 ${logLoadProgress.percent}%` : 'Streaming'}
+          </span>
         </div>
         <button
           onClick={onClear}
@@ -161,7 +200,7 @@ export default function LogPanel({
           </div>
         )}
         {logs.length === 0
-          ? <span className="text-secondary-text-color/40">로그 대기 중...</span>
+          ? (!loadingLabel && <span className="text-[11px] text-secondary-text-color/40">로그 대기 중...</span>)
           : sessions.map(sid => {
             const sessionLogs = logs.filter(e => e.sessionId === sid);
             const isCurrent = sid === currentSessionId;
@@ -196,21 +235,70 @@ export default function LogPanel({
               );
             }
 
-            return sessionLogs.map((entry, i) => (
-              entry.type === 'marker'
-                ? (
-                  <div key={`${sid}-${i}`} className="flex items-center gap-2 py-0.5">
-                    <span className="text-secondary-text-color/40 shrink-0">{formatTimestamp(entry.timestamp)}</span>
-                    <span className="h-px bg-border-color flex-1" />
-                    <span className="text-secondary-text-color/70 text-[10px] shrink-0">{markerLabel(entry)}</span>
-                    <span className="h-px bg-border-color flex-1" />
-                  </div>
-                )
-                : <div key={`${sid}-${i}`} className="flex gap-2">{renderLogLine(entry)}</div>
-            ));
+            const hiddenCount = sessionLogs.length - currentVisibleCount;
+            const visibleLogs = hiddenCount > 0 ? sessionLogs.slice(-currentVisibleCount) : sessionLogs;
+            return (
+              <div key={sid}>
+                {hiddenCount > 0 && (
+                  <button
+                    onClick={() => {
+                      const oldStart = Math.max(0, sessionLogs.length - currentVisibleCount);
+                      const newStart = Math.max(0, oldStart - CURRENT_SESSION_RENDER_STEP);
+                      const added = sessionLogs.slice(newStart, oldStart).reduce((n, entry) => entry.type === 'marker' ? n : n + 1, 0);
+                      setCurrentVisibleCount(prev => prev + CURRENT_SESSION_RENDER_STEP);
+                      // 토스트가 이미 '추가 표시' 상태로 떠 있으면 누적, 아니면 새로 시작
+                      setToast(prev => prev?.mode === 'shown' ? { mode: 'shown', added: prev.added + added } : { mode: 'shown', added });
+                    }}
+                    className="text-secondary-text-color/40 hover:text-secondary-text-color transition-colors cursor-pointer text-[10px] py-0.5"
+                  >
+                    ▴ 이전 줄 {hiddenCount.toLocaleString()}줄 더보기
+                  </button>
+                )}
+                {visibleLogs.map((entry, i) => (
+                  entry.type === 'marker'
+                    ? (
+                      <div key={`${sid}-${i}`} className="flex items-center gap-2 py-0.5">
+                        <span className="text-secondary-text-color/40 shrink-0">{formatTimestamp(entry.timestamp)}</span>
+                        <span className="h-px bg-border-color flex-1" />
+                        <span className="text-secondary-text-color/70 text-[10px] shrink-0">{markerLabel(entry)}</span>
+                        <span className="h-px bg-border-color flex-1" />
+                      </div>
+                    )
+                    : <div key={`${sid}-${i}`} className="flex gap-2">{renderLogLine(entry)}</div>
+                ))}
+              </div>
+            );
           })
         }
         <div ref={logEndRef} />
+      </div>
+
+      {/* 우측 하단: 로딩 진행 표시와 "표시된 로그 수" 안내를 각각 독립적으로 쌓아서 동시에 보일 수 있게 한다 */}
+      <div className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-2">
+        {toast && (
+          <div className="flex items-center gap-2 rounded-md border border-border-color bg-modal-background-color/90 px-2.5 py-1.5 text-[10px] text-secondary-text-color shadow-md backdrop-blur-sm transition-opacity duration-300">
+            <Check className="w-3 h-3 shrink-0 text-service-color" />
+            <span>
+              {toast.mode === 'loaded'
+                ? `최근 로그 ${renderedLogCount.toLocaleString()}개를 불러와서 표시했습니다`
+                : `로그 ${toast.added.toLocaleString()}개를 추가로 표시했습니다`}
+            </span>
+          </div>
+        )}
+        {loadingLabel && (
+          <div className="flex items-center gap-2 rounded-md border border-border-color bg-modal-background-color/90 px-2.5 py-1.5 text-[10px] text-secondary-text-color shadow-md backdrop-blur-sm transition-opacity duration-300">
+            <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
+            <span>{loadingLabel}</span>
+            {isLoadingHistory && (
+              <div className="h-1 w-20 shrink-0 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full bg-service-color transition-all duration-150"
+                  style={{ width: `${logLoadProgress.percent}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
 import type { ContainerCounts, ContainerState, ServiceItem } from "../interfaces/ServiceItem.interface";
 
@@ -192,7 +192,11 @@ export function useServiceLog(
         stderr: entry.stderr,
       }));
       const markerLogs = (data.markers ?? []).filter(marker => SERVICE_SESSION_MARKER_EVENTS.has(marker.event)).map(markerToLogEntry);
-      setLogs(prev => mergeLogs(prev, [...historyLogs, ...markerLogs]));
+      const applyMerge = () => setLogs(prev => mergeLogs(prev, [...historyLogs, ...markerLogs]));
+      // 과거 로그 prepend는 스크롤 위치 보정과 동기화돼야 하므로 즉시 반영하고,
+      // 초기 히스토리 대량 머지는 transition으로 낮춰 로딩 중 UI 입력이 막히지 않게 한다.
+      if (isPrependingLogsRef.current) applyMerge();
+      else startTransition(applyMerge);
       setHasOlderLogs(data.hasMore ?? historyLogs.length > 0);
       setIsLoadingOlderLogs(false);
       loadingOlderLogsRef.current = false;

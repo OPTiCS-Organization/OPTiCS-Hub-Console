@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, ChevronDown, ChevronRight, GitBranch, Globe, Package, Pencil, Play, Square, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, GitBranch, Globe, Package, Pencil, Play, Square, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
@@ -10,6 +10,24 @@ import { statusDot, statusLabel, presetLabel } from "../constants/service";
 import type { ServiceItem } from "../interfaces/ServiceItem.interface";
 import ServiceForm from "../components/service/ServiceForm";
 import LogPanel from "../components/service/LogPanel";
+
+type TabKey = 'overview' | 'containers' | 'logs';
+
+const SERVICE_DOMAIN = import.meta.env.VITE_SERVICE_DOMAIN as string;
+
+// 서브도메인 → 접속 가능한 전체 URL (예: hwplace → https://hwplace.service.optics.run/)
+function buildServiceUrl(subdomain: string): string {
+  return `https://${subdomain}.${SERVICE_DOMAIN}/`;
+}
+
+function InfoRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-start gap-4 py-2.5 border-b border-border-color/40 last:border-0">
+      <span className="w-24 shrink-0 text-xs text-secondary-text-color/70">{label}</span>
+      <div className="min-w-0 flex-1 text-xs text-primary-text-color">{children}</div>
+    </div>
+  );
+}
 
 export default function ServiceDetail() {
   const { serviceIndex } = useParams<{ serviceIndex: string }>();
@@ -22,7 +40,7 @@ export default function ServiceDetail() {
   const { openModal, closeModal } = useModal();
   const { currentWorkspace } = useWorkspace();
 
-  const [containersExpanded, setContainersExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>('logs');
 
   const [subdomainEditing, setSubdomainEditing] = useState(false);
   const [subdomainInput, setSubdomainInput] = useState('');
@@ -196,10 +214,26 @@ export default function ServiceDetail() {
     ));
   }
 
+  const sourceUrls: string[] = (() => {
+    if (!service.serviceSourceUrl) return [];
+    try {
+      const parsed = JSON.parse(service.serviceSourceUrl);
+      return Array.isArray(parsed) ? parsed : [service.serviceSourceUrl];
+    } catch {
+      return [service.serviceSourceUrl];
+    }
+  })();
+
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: 'overview', label: '개요' },
+    { key: 'containers', label: containers.length > 0 ? `컨테이너 (${containers.length})` : '컨테이너' },
+    { key: 'logs', label: '로그' },
+  ];
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden pt-20 text-primary-text-color">
 
-      {/* 헤더 */}
+      {/* 뒤로가기 */}
       <button
         onClick={() => navigate('/services')}
         className="mb-4 flex w-fit shrink-0 items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
@@ -208,18 +242,19 @@ export default function ServiceDetail() {
         목록으로
       </button>
 
-      <div className="mb-4 flex shrink-0 items-start gap-4">
-        <div className="relative w-10 h-10 rounded-md bg-modal-box-color border border-border-color flex items-center justify-center shrink-0">
-          <Package className="w-5 h-5 text-secondary-text-color" />
-          <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background-color ${statusDot[service.serviceStatus]}`} />
-        </div>
-        <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <h1 className="text-lg font-bold">{service.serviceName}</h1>
-            <span className="text-secondary-text-color/60 text-xs">{presetLabel[service.serviceDeployPreset]}</span>
+      {/* 헤더: 정체성 + 제어 */}
+      <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="relative w-10 h-10 rounded-md bg-modal-box-color border border-border-color flex items-center justify-center shrink-0">
+            <Package className="w-5 h-5 text-secondary-text-color" />
+            <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background-color ${statusDot[service.serviceStatus]}`} />
           </div>
-          <div className="flex items-center gap-3 text-xs">
-            <span className={service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : service.serviceStatus === 'starting' || service.serviceStatus === 'building' ? 'text-yellow-400' : 'text-secondary-text-color'}>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <h1 className="text-lg font-bold truncate">{service.serviceName}</h1>
+              <span className="text-secondary-text-color/60 text-xs shrink-0">{presetLabel[service.serviceDeployPreset]}</span>
+            </div>
+            <span className={`text-xs ${service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : service.serviceStatus === 'starting' || service.serviceStatus === 'building' ? 'text-yellow-400' : 'text-secondary-text-color'}`}>
               {statusLabel[service.serviceStatus]}
               {containerCounts && containerCounts.total > 0 && (
                 <span className="text-secondary-text-color/60 ml-0.5">
@@ -227,151 +262,190 @@ export default function ServiceDetail() {
                 </span>
               )}
             </span>
-            <span className="text-secondary-text-color/40">·</span>
-            <span className="text-secondary-text-color">v{service.serviceVersion}</span>
-            <span className="text-secondary-text-color/40">·</span>
-            <span className="text-secondary-text-color">
-              :{service.serviceHostPort ?? service.servicePort}
-              {(service.serviceContainerPort ?? service.servicePort) !== (service.serviceHostPort ?? service.servicePort)
-                ? ` -> :${service.serviceContainerPort ?? service.servicePort}`
-                : ''}
-            </span>
-            {service.agentName && (
-              <>
-                <span className="text-secondary-text-color/40">·</span>
-                <span className="text-secondary-text-color/70">{service.agentName}</span>
-              </>
-            )}
-            {containers.length > 0 && (
-              <button
-                onClick={() => setContainersExpanded(prev => !prev)}
-                className="flex items-center gap-0.5 text-secondary-text-color/60 hover:text-primary-text-color transition-colors cursor-pointer"
-              >
-                {containersExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              </button>
-            )}
           </div>
-          {containersExpanded && containers.length > 0 && (
-            <div className="mt-2 flex flex-col gap-1">
-              {containers.map(c => (
-                <div key={c.name} className="flex items-center gap-2 text-xs w-full">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                    c.status === 'running' ? 'bg-green-400'
-                    : c.status === 'starting' || c.status === 'building' ? 'bg-yellow-400 animate-pulse'
-                    : c.status === 'failed' ? 'bg-red-400'
-                    : 'bg-secondary-text-color/40'
-                  }`} />
-                  <span className="font-mono text-secondary-text-color/70">{c.name}</span>
-                  {c.service && c.service !== c.name && (
-                    <span className="text-secondary-text-color/40">{c.service}</span>
-                  )}
-                  <span className={
-                    c.status === 'running' ? 'text-green-400'
-                    : c.status === 'starting' || c.status === 'building' ? 'text-yellow-400'
-                    : c.status === 'failed' ? 'text-red-400'
-                    : 'text-secondary-text-color/50'
-                  }>{c.status}</span>
-                  {c.health && (
-                    <span className="text-secondary-text-color/40">health: {c.health}</span>
-                  )}
-                  <div className="ml-auto flex items-center gap-2">
-                    {!isRemoved && (c.status === 'stopped' || c.status === 'failed') && (
-                      <Play className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'start'); }} />
-                    )}
-                    {!isRemoved && (c.status === 'running' || c.status === 'starting') && (
-                      <Square className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'stop'); }} />
-                    )}
-                    {!isRemoved && c.status === 'running' && (
-                      <RefreshCw className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'restart'); }} />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-3">
+          {!isRemoved && (
+            <>
+              <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
+              <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />
+            </>
           )}
-          {service.serviceSourceUrl && (() => {
-            let urls: string[];
-            try { const p = JSON.parse(service.serviceSourceUrl); urls = Array.isArray(p) ? p : [service.serviceSourceUrl]; }
-            catch { urls = [service.serviceSourceUrl]; }
-            return (
-              <div className="flex flex-col gap-0.5 mt-1">
-                {urls.map((url, i) => (
-                  <div key={i} className="flex items-center gap-1.5 text-xs text-secondary-text-color/60">
-                    <GitBranch className="w-3 h-3 shrink-0" />
-                    <span className="font-mono truncate">{url}</span>
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
-          {service.serviceRootDirectory && (
-            <div className="mt-1 text-xs text-secondary-text-color/60">
-              root: <span className="font-mono">{service.serviceRootDirectory}</span>
-            </div>
-          )}
-          <div className="mt-1 flex items-center gap-1.5 text-xs text-secondary-text-color/60">
-            <Globe className="w-3 h-3 shrink-0" />
-            {subdomainEditing ? (
-              <>
-                <input
-                  value={subdomainInput}
-                  onChange={e => { setSubdomainInput(e.target.value); setSubdomainError(null); }}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') void handleSaveSubdomain();
-                    if (e.key === 'Escape') { setSubdomainEditing(false); setSubdomainError(null); }
-                  }}
-                  placeholder="subdomain"
-                  autoFocus
-                  className="w-40 rounded border border-border-color bg-transparent px-1.5 py-0.5 font-mono text-xs text-primary-text-color outline-none focus:border-service-color"
-                />
-                <Check className="w-3 h-3 cursor-pointer hover:text-green-400 transition-colors" onClick={() => { void handleSaveSubdomain(); }} />
-                <X className="w-3 h-3 cursor-pointer hover:text-red-400 transition-colors" onClick={() => { setSubdomainEditing(false); setSubdomainError(null); }} />
-              </>
-            ) : (
-              <>
-                <span className="font-mono">{service.serviceSubdomain ?? '서브도메인 미설정'}</span>
-                {!isRemoved && (
-                  <Pencil
-                    className="w-3 h-3 cursor-pointer hover:text-primary-text-color transition-colors"
-                    onClick={() => { setSubdomainInput(service.serviceSubdomain ?? ''); setSubdomainEditing(true); }}
-                  />
-                )}
-              </>
-            )}
-            {subdomainError && <span className="text-red-400">{subdomainError}</span>}
-          </div>
-          <div className="mt-1 flex items-center gap-3">
-            {!isRemoved && (
-              <>
-                <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
-                <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />
-              </>
-            )}
-            <RefreshCw
-              className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors"
-              onClick={() => {
-                if (!service || !currentWorkspace) return;
-                openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { void fetchService(); }} />);
-              }}
-            />
-            <Trash2 className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleDeleteService()} />
-          </div>
+          <RefreshCw
+            className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors"
+            onClick={() => {
+              if (!service || !currentWorkspace) return;
+              openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { void fetchService(); }} />);
+            }}
+          />
+          <Trash2 className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleDeleteService()} />
         </div>
       </div>
 
-      {/* 로그 패널 */}
-      <LogPanel
-        logs={logs}
-        currentSessionId={currentSessionId}
-        expandedSessions={expandedSessions}
-        setExpandedSessions={setExpandedSessions}
-        onClear={() => setLogs([])}
-        logEndRef={logEndRef}
-        logLoadProgress={logLoadProgress}
-        isLoadingOlderLogs={isLoadingOlderLogs}
-        hasOlderLogs={hasOlderLogs}
-        onLoadOlder={loadOlderLogs}
-      />
+      {/* 탭 바 */}
+      <div className="mb-3 flex shrink-0 items-center gap-1 border-b border-border-color">
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`-mb-px border-b-2 px-3 py-2 text-xs font-medium transition-colors cursor-pointer ${
+              activeTab === tab.key
+                ? 'border-service-color text-primary-text-color'
+                : 'border-transparent text-secondary-text-color hover:text-primary-text-color'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 탭 콘텐츠 */}
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+
+        {activeTab === 'overview' && (
+          <div className="overflow-y-auto pr-1">
+            <InfoRow label="버전">v{service.serviceVersion}</InfoRow>
+            <InfoRow label="포트">
+              <span className="font-mono">
+                :{service.serviceHostPort ?? service.servicePort}
+                {(service.serviceContainerPort ?? service.servicePort) !== (service.serviceHostPort ?? service.servicePort)
+                  ? ` -> :${service.serviceContainerPort ?? service.servicePort}`
+                  : ''}
+              </span>
+            </InfoRow>
+            <InfoRow label="에이전트">
+              {service.agentName ?? <span className="text-secondary-text-color/50">미연결</span>}
+            </InfoRow>
+            <InfoRow label="소스">
+              {sourceUrls.length === 0
+                ? <span className="text-secondary-text-color/50">없음</span>
+                : (
+                  <div className="flex flex-col gap-0.5">
+                    {sourceUrls.map((url, i) => (
+                      <div key={i} className="flex items-center gap-1.5 text-secondary-text-color/80">
+                        <GitBranch className="w-3 h-3 shrink-0" />
+                        <span className="font-mono truncate">{url}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+            </InfoRow>
+            {service.serviceRootDirectory && (
+              <InfoRow label="루트 디렉터리">
+                <span className="font-mono">{service.serviceRootDirectory}</span>
+              </InfoRow>
+            )}
+            <InfoRow label="서브도메인">
+              <div className="flex items-center gap-1.5">
+                <Globe className="w-3 h-3 shrink-0 text-secondary-text-color/60" />
+                {subdomainEditing ? (
+                  <>
+                    <input
+                      value={subdomainInput}
+                      onChange={e => { setSubdomainInput(e.target.value); setSubdomainError(null); }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') void handleSaveSubdomain();
+                        if (e.key === 'Escape') { setSubdomainEditing(false); setSubdomainError(null); }
+                      }}
+                      placeholder="subdomain"
+                      autoFocus
+                      className="w-40 rounded border border-border-color bg-transparent px-1.5 py-0.5 font-mono text-xs text-primary-text-color outline-none focus:border-service-color"
+                    />
+                    <Check className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-green-400 transition-colors" onClick={() => { void handleSaveSubdomain(); }} />
+                    <X className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => { setSubdomainEditing(false); setSubdomainError(null); }} />
+                  </>
+                ) : (
+                  <>
+                    {service.serviceSubdomain ? (
+                      <a
+                        href={buildServiceUrl(service.serviceSubdomain)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-service-color hover:underline truncate"
+                      >
+                        {buildServiceUrl(service.serviceSubdomain)}
+                      </a>
+                    ) : (
+                      <span className="font-mono text-secondary-text-color/50">미설정</span>
+                    )}
+                    {!isRemoved && (
+                      <Pencil
+                        className="w-3 h-3 shrink-0 cursor-pointer text-secondary-text-color/60 hover:text-primary-text-color transition-colors"
+                        onClick={() => { setSubdomainInput(service.serviceSubdomain ?? ''); setSubdomainEditing(true); }}
+                      />
+                    )}
+                  </>
+                )}
+                {subdomainError && <span className="text-red-400">{subdomainError}</span>}
+              </div>
+            </InfoRow>
+            <InfoRow label="생성일">
+              <span className="text-secondary-text-color/80">{new Date(service.serviceCreatedAt).toLocaleString()}</span>
+            </InfoRow>
+          </div>
+        )}
+
+        {activeTab === 'containers' && (
+          <div className="overflow-y-auto pr-1">
+            {containers.length === 0 ? (
+              <p className="py-6 text-center text-xs text-secondary-text-color/50">실행 중인 컨테이너가 없습니다.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {containers.map(c => (
+                  <div key={c.name} className="flex items-center gap-2 rounded-md border border-border-color/50 px-3 py-2 text-xs">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                      c.status === 'running' ? 'bg-green-400'
+                      : c.status === 'starting' || c.status === 'building' ? 'bg-yellow-400 animate-pulse'
+                      : c.status === 'failed' ? 'bg-red-400'
+                      : 'bg-secondary-text-color/40'
+                    }`} />
+                    <span className="font-mono text-secondary-text-color/80">{c.name}</span>
+                    {c.service && c.service !== c.name && (
+                      <span className="text-secondary-text-color/40">{c.service}</span>
+                    )}
+                    <span className={
+                      c.status === 'running' ? 'text-green-400'
+                      : c.status === 'starting' || c.status === 'building' ? 'text-yellow-400'
+                      : c.status === 'failed' ? 'text-red-400'
+                      : 'text-secondary-text-color/50'
+                    }>{c.status}</span>
+                    {c.health && (
+                      <span className="text-secondary-text-color/40">health: {c.health}</span>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      {!isRemoved && (c.status === 'stopped' || c.status === 'failed') && (
+                        <Play className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'start'); }} />
+                      )}
+                      {!isRemoved && (c.status === 'running' || c.status === 'starting') && (
+                        <Square className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'stop'); }} />
+                      )}
+                      {!isRemoved && c.status === 'running' && (
+                        <RefreshCw className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'restart'); }} />
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'logs' && (
+          <LogPanel
+            logs={logs}
+            currentSessionId={currentSessionId}
+            expandedSessions={expandedSessions}
+            setExpandedSessions={setExpandedSessions}
+            onClear={() => setLogs([])}
+            logEndRef={logEndRef}
+            logLoadProgress={logLoadProgress}
+            isLoadingOlderLogs={isLoadingOlderLogs}
+            hasOlderLogs={hasOlderLogs}
+            onLoadOlder={loadOlderLogs}
+          />
+        )}
+      </div>
 
     </div>
   );
