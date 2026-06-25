@@ -1,10 +1,9 @@
-import { useState } from "react";
-import { Loader2, Plus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
 import { apiFetch } from "../../lib/apiFetch";
 import { useAuth } from "../../context/Auth.context";
 import { useModal } from "../../context/Modal.context";
 import { useAgents } from "../../hooks/useAgents";
-import { inputCls, labelCls } from "../ui/Field";
 import type { EnvEntry } from "../../interfaces/EnvEntry.interface";
 import type { ServiceItem } from "../../interfaces/ServiceItem.interface";
 
@@ -15,16 +14,127 @@ interface ServiceFormProps {
   service?: ServiceItem;
 }
 
+type CreateStep = 'source' | 'runtime' | 'env' | 'review';
+type PortMappingEntry = {
+  hostPort: string;
+  containerPort: string;
+};
+type SourceRepositoryEntry = {
+  url: string;
+  rootDirectory: string;
+};
+
+const createSteps: { key: CreateStep; label: string }[] = [
+  { key: 'source', label: '소스' },
+  { key: 'runtime', label: '설정' },
+  { key: 'env', label: '환경 변수' },
+  { key: 'review', label: '확인' },
+];
+
+const compactInputCls = "h-8 w-full rounded-sm border border-border-color bg-modal-box-color px-2.5 text-xs text-primary-text-color placeholder:text-secondary-text-color/40 outline-none transition-colors duration-100 focus:border-service-color";
+const compactValidInputCls = "border-success-color/60 bg-success-color/5";
+const compactLabelCls = "text-[10px] font-medium uppercase tracking-wider text-secondary-text-color";
+
+function normalizeRootDirectory(value?: string | null) {
+  return (value ?? '').trim().replace(/^\/+/, '');
+}
+
+function parseSourceRepositories(raw?: string, fallbackRootDirectory?: string | null): SourceRepositoryEntry[] {
+  if (!raw) return [{ url: '', rootDirectory: normalizeRootDirectory(fallbackRootDirectory) }];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      const entries = parsed.map((entry): SourceRepositoryEntry => {
+        if (typeof entry === 'string') {
+          return { url: entry, rootDirectory: '' };
+        }
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>;
+          return {
+            url: String(record.url ?? record.sourceUrl ?? ''),
+            rootDirectory: normalizeRootDirectory(String(record.rootDirectory ?? '')),
+          };
+        }
+        return { url: '', rootDirectory: '' };
+      });
+      return entries.length > 0 ? entries : [{ url: '', rootDirectory: '' }];
+    }
+    return [{ url: raw, rootDirectory: normalizeRootDirectory(fallbackRootDirectory) }];
+  } catch {
+    return [{ url: raw, rootDirectory: normalizeRootDirectory(fallbackRootDirectory) }];
+  }
+}
+
+function parseEnvClipboard(text: string): EnvEntry[] {
+  return text
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(line => line && !line.startsWith('#'))
+    .map(line => line.startsWith('export ') ? line.slice(7).trim() : line)
+    .map(line => {
+      const separatorIndex = line.indexOf('=');
+      if (separatorIndex <= 0) return null;
+
+      const key = line.slice(0, separatorIndex).trim();
+      const rawValue = line.slice(separatorIndex + 1).trim();
+      const value = rawValue.length >= 2 && (
+        (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
+        (rawValue.startsWith("'") && rawValue.endsWith("'"))
+      )
+        ? rawValue.slice(1, -1)
+        : rawValue;
+
+      return key ? { key, value } : null;
+    })
+    .filter((entry): entry is EnvEntry => entry !== null);
+}
+
+function isValidPort(value: string) {
+  const port = Number(value);
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
+}
+
+function isValidGithubRepoUrl(value: string) {
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:') return false;
+    if (url.hostname.toLowerCase() !== 'github.com') return false;
+    const segments = url.pathname.replace(/\/+$/, '').split('/').filter(Boolean);
+    if (segments.length !== 2) return false;
+    return /^[A-Za-z0-9_.-]+$/.test(segments[0]) && /^[A-Za-z0-9_.-]+(?:\.git)?$/.test(segments[1]);
+  } catch {
+    return false;
+  }
+}
+
+function initialPortMappings(service?: ServiceItem): PortMappingEntry[] {
+  const mappings = service?.servicePortMappings;
+  if (mappings && mappings.length > 0) {
+    return mappings.map(mapping => ({
+      hostPort: String(mapping.hostPort),
+      containerPort: String(mapping.containerPort),
+    }));
+  }
+
+  return [{
+    hostPort: service ? String(service.serviceHostPort ?? service.servicePort) : '',
+    containerPort: service ? String(service.serviceContainerPort ?? service.servicePort) : '',
+  }];
+}
+
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2.5 border-b border-border-color/50 py-2 last:border-0">
+      <span className="text-xs text-secondary-text-color">{label}</span>
+      <div className="min-w-0 text-xs text-primary-text-color">{value}</div>
+    </div>
+  );
+}
+
 export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }: ServiceFormProps) {
   const { logout } = useAuth();
-  const { closeModal } = useModal();
+  const { closeModal, setCloseGuard } = useModal();
   const agents = useAgents(workspaceIndex, logout);
-
-  const parseUrls = (raw?: string): string[] => {
-    if (!raw) return [''];
-    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : [raw]; }
-    catch { return [raw]; }
-  };
 
   const [form, setForm] = useState({
     serviceName: service?.serviceName ?? '',
@@ -35,46 +145,242 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     serviceDeployPreset: (service?.serviceDeployPreset ?? 'dockerfile') as string,
     agentIndex: service ? String(service.agentIndex) : '',
   });
-  const [sourceUrls, setSourceUrls] = useState<string[]>(parseUrls(service?.serviceSourceUrl));
-  const [envEntries, setEnvEntries] = useState<EnvEntry[]>(
-    Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
+  const [sourceRepositories, setSourceRepositories] = useState<SourceRepositoryEntry[]>(
+    () => parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory),
   );
+  const [portMappings, setPortMappings] = useState<PortMappingEntry[]>(() => initialPortMappings(service));
+  const [envEntries, setEnvEntries] = useState<EnvEntry[]>(() => {
+    const entries = Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value }));
+    return entries.length > 0 ? entries : [{ key: '', value: '' }];
+  });
+  const [currentStep, setCurrentStep] = useState<CreateStep>('source');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 에이전트 목록이 로드되면 기본값 세팅
-  if (!form.agentIndex && agents.length > 0) {
-    setForm(f => ({ ...f, agentIndex: String(agents[0].agentIndex) }));
-  }
+  useEffect(() => {
+    if (!form.agentIndex && agents.length > 0) {
+      setForm(f => ({ ...f, agentIndex: String(agents[0].agentIndex) }));
+    }
+  }, [agents, form.agentIndex]);
+
+  const isCompose = form.serviceDeployPreset === 'compose';
+  const isCreateMode = mode === 'create';
+  const currentStepIndex = createSteps.findIndex(step => step.key === currentStep);
+  const selectedAgent = agents.find(agent => String(agent.agentIndex) === form.agentIndex);
+  const envWithKeys = envEntries.filter(entry => entry.key.trim());
+  const initialDirtySnapshot = useMemo(() => JSON.stringify({
+    form: {
+      serviceName: service?.serviceName ?? '',
+      serviceRootDirectory: service?.serviceRootDirectory ?? '',
+      serviceVersion: service?.serviceVersion ?? '1.0.0',
+      serviceDeployPreset: service?.serviceDeployPreset ?? 'dockerfile',
+      agentIndex: service ? String(service.agentIndex) : '',
+    },
+    sourceRepositories: parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory),
+    portMappings: initialPortMappings(service),
+    envEntries: Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
+  }), [service]);
+  const currentDirtySnapshot = useMemo(() => JSON.stringify({
+    form: {
+      serviceName: form.serviceName,
+      serviceRootDirectory: form.serviceRootDirectory,
+      serviceVersion: form.serviceVersion,
+      serviceDeployPreset: form.serviceDeployPreset,
+      agentIndex: form.agentIndex,
+    },
+    sourceRepositories,
+    portMappings,
+    envEntries: envEntries.filter(entry => entry.key.trim() || entry.value.trim()),
+  }), [envEntries, form, portMappings, sourceRepositories]);
+  const hasCreateInput = useMemo(() => (
+    form.serviceName.trim() !== '' ||
+    form.serviceRootDirectory.trim() !== '' ||
+    form.serviceVersion.trim() !== '1.0.0' ||
+    form.serviceDeployPreset !== 'dockerfile' ||
+    sourceRepositories.some(repo => repo.url.trim() !== '' || repo.rootDirectory.trim() !== '') ||
+    portMappings.some(mapping => mapping.hostPort.trim() !== '' || mapping.containerPort.trim() !== '') ||
+    envEntries.some(entry => entry.key.trim() !== '' || entry.value.trim() !== '')
+  ), [envEntries, form, portMappings, sourceRepositories]);
+  const shouldConfirmClose = isCreateMode
+    ? hasCreateInput
+    : currentDirtySnapshot !== initialDirtySnapshot;
+  const duplicateEnvKeys = useMemo(() => {
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    envWithKeys.forEach(entry => {
+      const key = entry.key.trim();
+      if (seen.has(key)) duplicates.add(key);
+      seen.add(key);
+    });
+    return Array.from(duplicates);
+  }, [envWithKeys]);
+
+  useEffect(() => {
+    setCloseGuard(() => shouldConfirmClose);
+    return () => setCloseGuard(null);
+  }, [setCloseGuard, shouldConfirmClose]);
 
   function set(key: keyof typeof form, value: string) {
+    setError(null);
     setForm(f => ({ ...f, [key]: value }));
-    if (key === 'serviceDeployPreset' && value !== 'compose') {
-      setSourceUrls(prev => [prev[0] ?? '']);
+  }
+
+  function updateSourceRepository(index: number, field: keyof SourceRepositoryEntry, value: string) {
+    setError(null);
+    const normalizedValue = field === 'rootDirectory' ? normalizeRootDirectory(value) : value;
+    setSourceRepositories(prev => prev.map((repo, i) => i === index ? { ...repo, [field]: normalizedValue } : repo));
+  }
+
+  function addSourceRepository() { setSourceRepositories(prev => [...prev, { url: '', rootDirectory: '' }]); }
+  function removeSourceRepository(index: number) {
+    setSourceRepositories(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ url: '', rootDirectory: '' }];
+    });
+  }
+  function addPortMapping() { setPortMappings(prev => [...prev, { hostPort: '', containerPort: '' }]); }
+  function updatePortMapping(index: number, field: keyof PortMappingEntry, value: string) {
+    setError(null);
+    setPortMappings(prev => prev.map((mapping, i) => i === index ? { ...mapping, [field]: value } : mapping));
+  }
+  function removePortMapping(index: number) {
+    setPortMappings(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ hostPort: '', containerPort: '' }];
+    });
+  }
+  function addEnvEntry() { setEnvEntries(prev => [...prev, { key: '', value: '' }]); }
+  function updateEnvEntry(index: number, field: 'key' | 'value', value: string) {
+    setError(null);
+    setEnvEntries(prev => prev.map((entry, i) => i === index ? { ...entry, [field]: value } : entry));
+  }
+  function removeEnvEntry(index: number) {
+    setEnvEntries(prev => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ key: '', value: '' }];
+    });
+  }
+
+  function handleEnvPaste(e: React.ClipboardEvent<HTMLInputElement>, index: number) {
+    const parsedEntries = parseEnvClipboard(e.clipboardData.getData('text'));
+    if (parsedEntries.length === 0) return;
+
+    e.preventDefault();
+    setError(null);
+    setEnvEntries(prev => {
+      const next = [...prev];
+      next.splice(index, parsedEntries.length, ...parsedEntries);
+      return next;
+    });
+  }
+
+  function getStepError(step: CreateStep) {
+    if (step === 'source') {
+      if (!form.serviceName.trim()) return '서비스명을 입력해주세요.';
+      if (!sourceRepositories[0]?.url.trim()) return '소스 URL을 입력해주세요.';
+      const invalidUrl = sourceRepositories.map(repo => repo.url.trim()).filter(Boolean).find(url => !isValidGithubRepoUrl(url));
+      if (invalidUrl) return 'GitHub 레포 URL은 https://github.com/owner/repo 형식이어야 합니다.';
+    }
+
+    if (step === 'runtime') {
+      for (const mapping of portMappings) {
+        if (!isValidPort(mapping.hostPort)) return '외부 포트는 1-65535 사이 숫자로 입력해주세요.';
+        if (!isValidPort(mapping.containerPort)) return '내부 포트는 1-65535 사이 숫자로 입력해주세요.';
+      }
+      const hostPorts = portMappings.map(mapping => mapping.hostPort.trim());
+      const containerPorts = portMappings.map(mapping => mapping.containerPort.trim());
+      if (new Set(hostPorts).size !== hostPorts.length) return '외부 포트가 중복되었습니다.';
+      if (new Set(containerPorts).size !== containerPorts.length) return '내부 포트가 중복되었습니다.';
+      if (!form.serviceVersion.trim()) return '버전을 입력해주세요.';
+      if (agents.length === 0) return '연결된 에이전트가 없습니다.';
+      if (!form.agentIndex) return '배포할 에이전트를 선택해주세요.';
+    }
+
+    if (step === 'env' && duplicateEnvKeys.length > 0) {
+      return `중복된 환경 변수 키가 있습니다: ${duplicateEnvKeys.join(', ')}`;
+    }
+
+    return null;
+  }
+
+  function goToStep(step: CreateStep) {
+    const targetIndex = createSteps.findIndex(item => item.key === step);
+    if (targetIndex <= currentStepIndex) {
+      setError(null);
+      setCurrentStep(step);
+      return;
+    }
+
+    for (let i = 0; i < targetIndex; i += 1) {
+      const stepError = getStepError(createSteps[i].key);
+      if (stepError) {
+        setError(stepError);
+        setCurrentStep(createSteps[i].key);
+        return;
+      }
+    }
+
+    setError(null);
+    setCurrentStep(step);
+  }
+
+  function goNext() {
+    const stepError = getStepError(currentStep);
+    if (stepError) {
+      setError(stepError);
+      return;
+    }
+
+    const nextStep = createSteps[currentStepIndex + 1];
+    if (nextStep) {
+      setError(null);
+      setCurrentStep(nextStep.key);
     }
   }
 
-  function setUrl(index: number, value: string) {
-    setSourceUrls(prev => prev.map((u, i) => i === index ? value : u));
+  function goBack() {
+    const previousStep = createSteps[currentStepIndex - 1];
+    if (previousStep) {
+      setError(null);
+      setCurrentStep(previousStep.key);
+    }
   }
 
-  function addUrl() { setSourceUrls(prev => [...prev, '']); }
-  function removeUrl(index: number) { setSourceUrls(prev => prev.filter((_, i) => i !== index)); }
-  function addEnvEntry() { setEnvEntries(prev => [...prev, { key: '', value: '' }]); }
-  function updateEnvEntry(index: number, field: 'key' | 'value', val: string) {
-    setEnvEntries(prev => prev.map((e, i) => i === index ? { ...e, [field]: val } : e));
-  }
-  function removeEnvEntry(index: number) { setEnvEntries(prev => prev.filter((_, i) => i !== index)); }
+  async function handleDeploy() {
+    if (isCreateMode && currentStep !== 'review') {
+      return;
+    }
 
-  async function handleSubmit(e: React.SyntheticEvent) {
-    e.preventDefault();
+    const validationSteps = isCreateMode ? createSteps.map(step => step.key) : (['source', 'runtime', 'env'] as CreateStep[]);
+    for (const step of validationSteps) {
+      const stepError = getStepError(step);
+      if (stepError) {
+        setError(stepError);
+        if (isCreateMode) setCurrentStep(step);
+        return;
+      }
+    }
+
     setLoading(true);
     setError(null);
-    const sourceUrl = sourceUrls.length === 1 ? sourceUrls[0] : sourceUrls;
-    const env = Object.fromEntries(envEntries.filter(e => e.key.trim()).map(e => [e.key, e.value]));
-    const serviceHostPort = parseInt(form.serviceHostPort);
-    const serviceContainerPort = parseInt(form.serviceContainerPort);
-    const serviceRootDirectory = form.serviceRootDirectory.trim();
+
+    const cleanedSourceRepositories = sourceRepositories
+      .map(repo => ({
+        url: repo.url.trim(),
+        rootDirectory: normalizeRootDirectory(repo.rootDirectory),
+      }))
+      .filter(repo => repo.url);
+    const primaryRootDirectory = cleanedSourceRepositories[0]?.rootDirectory ?? '';
+    const sourceUrl = cleanedSourceRepositories.length === 1 && !primaryRootDirectory
+      ? cleanedSourceRepositories[0].url
+      : cleanedSourceRepositories;
+    const env = Object.fromEntries(envWithKeys.map(entry => [entry.key.trim(), entry.value]));
+    const parsedPortMappings = portMappings.map(mapping => ({
+      hostPort: parseInt(mapping.hostPort, 10),
+      containerPort: parseInt(mapping.containerPort, 10),
+    }));
+    const primaryPortMapping = parsedPortMappings[0];
+    const serviceRootDirectory = primaryRootDirectory;
 
     const url = mode === 'create'
       ? '/v1/workspace/services/deploy'
@@ -83,27 +389,29 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     const body = mode === 'create'
       ? {
         workspaceIdx: workspaceIndex,
-        serviceName: form.serviceName,
-        servicePort: serviceHostPort,
-        serviceHostPort,
-        serviceContainerPort,
+        serviceName: form.serviceName.trim(),
+        servicePort: primaryPortMapping.hostPort,
+        serviceHostPort: primaryPortMapping.hostPort,
+        serviceContainerPort: primaryPortMapping.containerPort,
+        servicePortMappings: parsedPortMappings,
         serviceSourceUrl: sourceUrl,
         ...(serviceRootDirectory && { serviceRootDirectory }),
-        serviceVersion: form.serviceVersion,
+        serviceVersion: form.serviceVersion.trim(),
         serviceDeployPreset: form.serviceDeployPreset,
-        agentIndex: parseInt(form.agentIndex),
+        agentIndex: parseInt(form.agentIndex, 10),
         env,
       }
       : {
-        serviceName: form.serviceName,
-        servicePort: serviceHostPort,
-        serviceHostPort,
-        serviceContainerPort,
+        serviceName: form.serviceName.trim(),
+        servicePort: primaryPortMapping.hostPort,
+        serviceHostPort: primaryPortMapping.hostPort,
+        serviceContainerPort: primaryPortMapping.containerPort,
+        servicePortMappings: parsedPortMappings,
         serviceSourceUrl: sourceUrl,
         serviceRootDirectory,
-        serviceVersion: form.serviceVersion,
+        serviceVersion: form.serviceVersion.trim(),
         serviceDeployPreset: form.serviceDeployPreset,
-        agentIndex: parseInt(form.agentIndex),
+        agentIndex: parseInt(form.agentIndex, 10),
         env,
       };
 
@@ -119,7 +427,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         return;
       }
       onSuccess();
-      closeModal();
+      closeModal({ force: true });
     } catch {
       setError('Network error.');
     } finally {
@@ -127,134 +435,323 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     }
   }
 
-  const isCompose = form.serviceDeployPreset === 'compose';
-  const submitLabel = mode === 'create' ? '등록' : '재배포';
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1.5">
-        <label className={labelCls}>서비스명 <span className="text-service-color">*</span></label>
-        <input className={inputCls} placeholder="my-service" value={form.serviceName} onChange={e => set('serviceName', e.target.value)} autoFocus required />
-      </div>
-
-      <div className="flex gap-3">
-        <div className="flex-1 flex flex-col gap-1.5">
-          <div className="flex items-center justify-between">
-            <label className={labelCls}>소스 URL <span className="text-service-color">*</span></label>
-            {isCompose && (
-              <button type="button" onClick={addUrl} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
-                <Plus className="w-3 h-3" />
-                URL 추가
-              </button>
-            )}
+  function renderSourceFields() {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_150px]">
+          <div className="flex flex-col gap-1.5">
+            <label className={compactLabelCls}>서비스명 <span className="text-service-color">*</span></label>
+            <input className={compactInputCls} placeholder="my-service" value={form.serviceName} onChange={e => set('serviceName', e.target.value)} autoFocus required />
           </div>
-          <div className="flex flex-col gap-1.5 max-h-36 overflow-y-auto pr-1">
-            {sourceUrls.map((url, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <input
-                  className={inputCls}
-                  placeholder={i === 0 ? "https://github.com/..." : "https://github.com/... (추가 레포)"}
-                  value={url}
-                  onChange={e => setUrl(i, e.target.value)}
-                  required={i === 0}
-                />
-                {isCompose && sourceUrls.length > 1 && (
-                  <button type="button" onClick={() => removeUrl(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer shrink-0">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+          <div className="flex flex-col gap-1.5">
+            <label className={compactLabelCls}>프리셋 <span className="text-service-color">*</span></label>
+            <select className={compactInputCls} value={form.serviceDeployPreset} onChange={e => set('serviceDeployPreset', e.target.value)}>
+              <option value="dockerfile">Dockerfile</option>
+              <option value="compose">Compose</option>
+              <option value="preset_nestjs">NestJS</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2.5">
+            <label className={compactLabelCls}>소스 URL <span className="text-service-color">*</span></label>
+            <button type="button" onClick={addSourceRepository} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+              <Plus className="w-3 h-3" />
+              레포지토리 추가
+            </button>
+          </div>
+          <div className="flex max-h-48 flex-col gap-2 overflow-y-auto pr-1">
+            {sourceRepositories.map((repo, i) => (
+              <div key={i} className="optics-row-in rounded-sm border border-border-color/70 bg-modal-box-color/55 p-2">
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-medium text-tertiary-text-color">Repository {i + 1}</span>
+                  {sourceRepositories.length > 1 && (
+                    <button type="button" onClick={() => removeSourceRepository(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+                  <div className="relative min-w-0">
+                    <input
+                      className={`${compactInputCls} pr-8 ${repo.url.trim() && isValidGithubRepoUrl(repo.url) ? compactValidInputCls : ''}`}
+                      placeholder="https://github.com/owner/repo"
+                      value={repo.url}
+                      onChange={e => updateSourceRepository(i, 'url', e.target.value)}
+                      required={i === 0}
+                    />
+                    {repo.url.trim() && isValidGithubRepoUrl(repo.url) && (
+                      <Check className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-success-color" />
+                    )}
+                  </div>
+                  <input
+                    className={compactInputCls}
+                    placeholder="루트 디렉터리 (예: apps/api)"
+                    value={repo.rootDirectory}
+                    onChange={e => updateSourceRepository(i, 'rootDirectory', e.target.value)}
+                  />
+                </div>
               </div>
             ))}
           </div>
-        </div>
-        <div className="w-28 flex flex-col gap-1.5">
-          <label className={labelCls}>외부 포트 <span className="text-service-color">*</span></label>
-          <input className={inputCls} placeholder="80" type="number" value={form.serviceHostPort} onChange={e => set('serviceHostPort', e.target.value)} required />
-        </div>
-        <div className="w-28 flex flex-col gap-1.5">
-          <label className={labelCls}>내부 포트 <span className="text-service-color">*</span></label>
-          <input className={inputCls} placeholder="3000" type="number" value={form.serviceContainerPort} onChange={e => set('serviceContainerPort', e.target.value)} required />
+          <p className="text-[11px] text-secondary-text-color">루트 디렉터리는 앞의 /를 제거해서 저장됩니다.</p>
         </div>
       </div>
+    );
+  }
 
-      <div className="flex flex-col gap-1.5">
-        <label className={labelCls}>루트 디렉터리</label>
-        <input
-          className={inputCls}
-          placeholder="apps/api 또는 비워두면 레포 루트"
-          value={form.serviceRootDirectory}
-          onChange={e => set('serviceRootDirectory', e.target.value)}
-        />
-      </div>
-
-      <div className="flex gap-3">
-        <div className="flex-1 flex flex-col gap-1.5">
-          <label className={labelCls}>버전 <span className="text-service-color">*</span></label>
-          <input className={inputCls} placeholder="1.0.0" value={form.serviceVersion} onChange={e => set('serviceVersion', e.target.value)} required />
+  function renderRuntimeFields() {
+    return (
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2.5">
+            <label className={compactLabelCls}>포트 매핑 <span className="text-service-color">*</span></label>
+            <button type="button" onClick={addPortMapping} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+              <Plus className="w-3 h-3" />
+              추가
+            </button>
+          </div>
+          <div className="flex max-h-32 flex-col gap-1.5 overflow-y-auto pr-1">
+            {portMappings.map((mapping, index) => (
+              <div key={index} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
+                <input
+                  className={compactInputCls}
+                  placeholder="외부 포트"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={mapping.hostPort}
+                  onChange={e => updatePortMapping(index, 'hostPort', e.target.value)}
+                  required
+                />
+                <input
+                  className={compactInputCls}
+                  placeholder="내부 포트"
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={mapping.containerPort}
+                  onChange={e => updatePortMapping(index, 'containerPort', e.target.value)}
+                  required
+                />
+                <button type="button" onClick={() => removePortMapping(index)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-secondary-text-color">
+            {isCompose ? 'Compose 배포는 compose 파일의 ports 설정이 우선 적용됩니다.' : '외부 포트가 컨테이너 내부 포트로 연결됩니다.'}
+          </p>
         </div>
-        <div className="flex-1 flex flex-col gap-1.5">
-          <label className={labelCls}>프리셋 <span className="text-service-color">*</span></label>
-          <select className={inputCls} value={form.serviceDeployPreset} onChange={e => set('serviceDeployPreset', e.target.value)}>
-            <option value="dockerfile">Dockerfile</option>
-            <option value="compose">Compose</option>
-            <option value="preset_nestjs">NestJS</option>
-          </select>
+
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="flex flex-col gap-1.5">
+            <label className={compactLabelCls}>버전 <span className="text-service-color">*</span></label>
+            <input className={compactInputCls} placeholder="1.0.0" value={form.serviceVersion} onChange={e => set('serviceVersion', e.target.value)} required />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className={compactLabelCls}>에이전트 <span className="text-service-color">*</span></label>
+            {agents.length === 0
+              ? <p className="rounded-sm border border-border-color bg-modal-box-color px-3 py-2 text-xs text-secondary-text-color">연결된 에이전트가 없습니다.</p>
+              : (
+                <select className={compactInputCls} value={form.agentIndex} onChange={e => set('agentIndex', e.target.value)}>
+                  {agents.map(agent => <option key={agent.agentIndex} value={agent.agentIndex}>{agent.agentName}</option>)}
+                </select>
+              )
+            }
+          </div>
         </div>
       </div>
+    );
+  }
 
-      <div className="flex flex-col gap-1.5">
-        <label className={labelCls}>에이전트 <span className="text-service-color">*</span></label>
-        {agents.length === 0
-          ? <p className="text-secondary-text-color text-xs py-1">연결된 에이전트가 없습니다.</p>
-          : <select className={inputCls} value={form.agentIndex} onChange={e => set('agentIndex', e.target.value)}>
-            {agents.map(a => <option key={a.agentIndex} value={a.agentIndex}>{a.agentName}</option>)}
-          </select>
-        }
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between">
-          <label className={labelCls}>환경 변수</label>
+  function renderEnvFields() {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-2.5">
+          <label className={compactLabelCls}>환경 변수</label>
           <button type="button" onClick={addEnvEntry} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
             <Plus className="w-3 h-3" />
             추가
           </button>
         </div>
-        {envEntries.length > 0 && (
-          <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto pr-1">
-            {envEntries.map((entry, i) => (
-              <div key={i} className="flex gap-2 items-center">
-                <input className={inputCls} placeholder="KEY" value={entry.key} onChange={e => updateEnvEntry(i, 'key', e.target.value)} />
-                <input className={inputCls} placeholder="VALUE" value={entry.value} onChange={e => updateEnvEntry(i, 'value', e.target.value)} />
-                <button type="button" onClick={() => removeEnvEntry(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer shrink-0">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              </div>
+        <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto pr-1">
+          {envEntries.map((entry, i) => (
+            <div key={i} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
+              <input
+                className={compactInputCls}
+                placeholder="KEY"
+                value={entry.key}
+                onChange={e => updateEnvEntry(i, 'key', e.target.value)}
+                onPaste={e => handleEnvPaste(e, i)}
+              />
+              <input
+                className={compactInputCls}
+                placeholder="VALUE"
+                value={entry.value}
+                onChange={e => updateEnvEntry(i, 'value', e.target.value)}
+                onPaste={e => handleEnvPaste(e, i)}
+              />
+              <button type="button" onClick={() => removeEnvEntry(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+        <p className="text-[11px] leading-relaxed text-secondary-text-color">
+          .env 내용을 붙여넣으면 여러 줄이 자동으로 입력됩니다.
+        </p>
+      </div>
+    );
+  }
+
+  function renderReview() {
+    const repositories = sourceRepositories
+      .map(repo => ({ url: repo.url.trim(), rootDirectory: normalizeRootDirectory(repo.rootDirectory) }))
+      .filter(repo => repo.url);
+    return (
+      <div className="optics-panel-in rounded-sm border border-border-color bg-modal-box-color px-3 py-1">
+        <SummaryRow label="서비스명" value={form.serviceName.trim() || <span className="text-secondary-text-color">미입력</span>} />
+        <SummaryRow label="소스" value={
+          <div className="flex flex-col gap-1">
+            {repositories.map(repo => (
+              <span key={`${repo.url}:${repo.rootDirectory}`} className="truncate font-mono text-[11px] text-secondary-text-color">
+                {repo.url}{repo.rootDirectory ? ` / ${repo.rootDirectory}` : ''}
+              </span>
             ))}
           </div>
-        )}
+        } />
+        <SummaryRow label="프리셋" value={form.serviceDeployPreset} />
+        <SummaryRow label="포트" value={
+          <div className="flex flex-col gap-1 font-mono">
+            {portMappings.map(mapping => (
+              <span key={`${mapping.hostPort}:${mapping.containerPort}`}>:{mapping.hostPort} -&gt; :{mapping.containerPort}</span>
+            ))}
+          </div>
+        } />
+        <SummaryRow label="버전" value={`v${form.serviceVersion.trim()}`} />
+        <SummaryRow label="에이전트" value={selectedAgent?.agentName ?? <span className="text-secondary-text-color">미선택</span>} />
+        <SummaryRow label="환경 변수" value={`${envWithKeys.length}개`} />
+      </div>
+    );
+  }
+
+  function renderCreateStep() {
+    if (currentStep === 'source') return renderSourceFields();
+    if (currentStep === 'runtime') return renderRuntimeFields();
+    if (currentStep === 'env') return renderEnvFields();
+    return renderReview();
+  }
+
+  function renderRedeployFields() {
+    return (
+      <>
+        {renderSourceFields()}
+        {renderRuntimeFields()}
+        {renderEnvFields()}
+      </>
+    );
+  }
+
+  const submitLabel = mode === 'create' ? '배포 시작' : '재배포';
+  const isReviewStep = !isCreateMode || currentStep === 'review';
+
+  return (
+    <form onSubmit={e => e.preventDefault()} className="flex flex-col gap-3.5">
+      {isCreateMode && (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <span className="text-[10px] font-medium uppercase tracking-widest text-tertiary-text-color">
+                Step {currentStepIndex + 1} / {createSteps.length}
+              </span>
+              <p className="mt-0.5 text-[13px] font-semibold text-primary-text-color">
+                {createSteps[currentStepIndex].label}
+              </p>
+            </div>
+            <div className="hidden items-center gap-1 text-[11px] text-tertiary-text-color sm:flex">
+              {createSteps.map((step, index) => (
+                <button
+                  key={step.key}
+                  type="button"
+                  onClick={() => goToStep(step.key)}
+                  className={`px-1.5 py-0.5 transition-colors cursor-pointer ${
+                    index === currentStepIndex
+                      ? 'text-primary-text-color'
+                      : index < currentStepIndex
+                        ? 'text-secondary-text-color hover:text-primary-text-color'
+                        : 'text-tertiary-text-color hover:text-secondary-text-color'
+                  }`}
+                >
+                  {step.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            {createSteps.map((step, index) => (
+              <button
+                key={step.key}
+                type="button"
+                onClick={() => goToStep(step.key)}
+                aria-label={step.label}
+                className={`h-1.5 rounded-full transition-colors cursor-pointer ${
+                  index < currentStepIndex
+                    ? 'bg-service-color'
+                    : index === currentStepIndex
+                      ? 'optics-step-active bg-service-color'
+                      : 'bg-border-color hover:bg-border-strong-color'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div key={isCreateMode ? currentStep : 'redeploy'} className="optics-panel-in min-h-[218px]">
+        {isCreateMode ? renderCreateStep() : renderRedeployFields()}
       </div>
 
       {error && (
-        <div className="rounded-sm bg-red-500/10 border border-red-500/30 px-3 py-2">
+        <div className="flex items-start gap-2 rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2">
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
           <span className="text-xs text-red-400">{error}</span>
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2 pt-1">
+      <div className="flex items-center justify-between gap-2 border-t border-border-color pt-4">
         <button
-          type="button" onClick={closeModal} disabled={loading}
-          className="px-4 py-1.5 rounded-sm text-sm text-secondary-text-color hover:text-primary-text-color border border-border-color hover:border-border-color/80 hover:bg-white/5 transition-colors duration-100 cursor-pointer disabled:opacity-50"
+          type="button"
+          onClick={isCreateMode && currentStepIndex > 0 ? goBack : () => closeModal()}
+          disabled={loading}
+          className="flex h-8 items-center gap-1.5 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color hover:border-border-color/80 hover:bg-white/5 hover:text-primary-text-color transition-colors duration-100 cursor-pointer disabled:opacity-50"
         >
-          Cancel
+          {isCreateMode && currentStepIndex > 0 && <ChevronLeft className="h-3.5 w-3.5" />}
+          {isCreateMode && currentStepIndex > 0 ? '이전' : 'Cancel'}
         </button>
-        <button
-          type="submit" disabled={loading || agents.length === 0}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-sm text-sm font-semibold bg-service-color hover:opacity-80 text-white transition-opacity duration-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {submitLabel}
-        </button>
+
+        {isReviewStep ? (
+          <button
+            type="button"
+            onClick={() => { void handleDeploy(); }}
+            disabled={loading || agents.length === 0}
+            className="flex h-8 items-center gap-2 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white hover:opacity-80 transition-opacity duration-100 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {submitLabel}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={goNext}
+            className="flex h-8 items-center gap-1.5 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white hover:opacity-80 transition-opacity duration-100 cursor-pointer"
+          >
+            다음
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     </form>
   );
