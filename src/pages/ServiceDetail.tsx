@@ -92,7 +92,7 @@ export default function ServiceDetail() {
     if (!currentWorkspace || !serviceIndex) return;
     setServiceLoading(true);
     try {
-      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/services`, {}, logout);
+      const res = await apiFetch(`/v1/service/workspace/${currentWorkspace.workspaceIndex}`, {}, logout);
       if (!res.ok) {
         setService(null);
         return;
@@ -138,7 +138,7 @@ export default function ServiceDetail() {
 
   async function handleStartService() {
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/start`, { method: 'POST' }, logout);
+      const res = await apiFetch(`/v1/service/${serviceIndex}/start`, { method: 'POST' }, logout);
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
@@ -147,7 +147,7 @@ export default function ServiceDetail() {
 
   async function handleStopService() {
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/stop`, { method: 'POST' }, logout);
+      const res = await apiFetch(`/v1/service/${serviceIndex}/stop`, { method: 'POST' }, logout);
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
@@ -157,7 +157,7 @@ export default function ServiceDetail() {
   async function handleContainerAction(containerName: string, action: 'start' | 'stop' | 'restart') {
     if (!serviceIndex) return;
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/containers/${encodeURIComponent(containerName)}/${action}`, { method: 'POST' }, logout);
+      const res = await apiFetch(`/v1/service/${serviceIndex}/containers/${encodeURIComponent(containerName)}/${action}`, { method: 'POST' }, logout);
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
@@ -171,7 +171,7 @@ export default function ServiceDetail() {
       return;
     }
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/subdomain`, {
+      const res = await apiFetch(`/v1/service/${serviceIndex}/subdomain`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain: value === '' ? null : value }),
@@ -192,7 +192,7 @@ export default function ServiceDetail() {
   async function deleteService(deleteScope: 'containers' | 'service') {
     if (!service) return;
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}`, {
+      const res = await apiFetch(`/v1/service/${serviceIndex}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteScope }),

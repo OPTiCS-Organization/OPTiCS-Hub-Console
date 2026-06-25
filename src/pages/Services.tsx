@@ -45,7 +45,7 @@ export default function Services() {
     if (!currentWorkspace) return;
     setLoading(true);
     try {
-      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/services`, {}, logout);
+      const res = await apiFetch(`/v1/service/workspace/${currentWorkspace.workspaceIndex}`, {}, logout);
       const body = await res.json() as { data: { services: ServiceItem[] } };
       const nextServices = body.data.services;
       setServices(nextServices);

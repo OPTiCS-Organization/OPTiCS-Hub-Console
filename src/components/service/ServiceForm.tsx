@@ -383,8 +383,8 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     const serviceRootDirectory = primaryRootDirectory;
 
     const url = mode === 'create'
-      ? '/v1/workspace/services/deploy'
-      : `/v1/workspace/services/${service!.serviceIndex}/redeploy`;
+      ? '/v1/service/deploy'
+      : `/v1/service/${service!.serviceIndex}/redeploy`;
 
     const body = mode === 'create'
       ? {
