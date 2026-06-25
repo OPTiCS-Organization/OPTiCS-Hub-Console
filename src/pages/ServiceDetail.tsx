@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, GitBranch, Globe, Package, Pencil, Play, Square, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
@@ -18,6 +18,28 @@ const SERVICE_DOMAIN = import.meta.env.VITE_SERVICE_DOMAIN as string;
 // 서브도메인 → 접속 가능한 전체 URL (예: hwplace → https://hwplace.service.optics.run/)
 function buildServiceUrl(subdomain: string): string {
   return `https://${subdomain}.${SERVICE_DOMAIN}/`;
+}
+
+function parseSourceRepositories(raw: string) {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.map((entry) => {
+        if (typeof entry === 'string') return { url: entry, rootDirectory: null };
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>;
+          return {
+            url: String(record.url ?? record.sourceUrl ?? ''),
+            rootDirectory: record.rootDirectory ? String(record.rootDirectory) : null,
+          };
+        }
+        return { url: '', rootDirectory: null };
+      }).filter(entry => entry.url);
+    }
+  } catch {
+    // fall through
+  }
+  return [{ url: raw, rootDirectory: null }];
 }
 
 function InfoRow({ label, children }: { label: string; children: ReactNode }) {
@@ -70,7 +92,7 @@ export default function ServiceDetail() {
     if (!currentWorkspace || !serviceIndex) return;
     setServiceLoading(true);
     try {
-      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/services`, {}, logout);
+      const res = await apiFetch(`/v1/service/workspace/${currentWorkspace.workspaceIndex}`, {}, logout);
       if (!res.ok) {
         setService(null);
         return;
@@ -102,18 +124,21 @@ export default function ServiceDetail() {
     return (
       <div className="text-primary-text-color mt-20 flex flex-col items-center gap-3">
         <p className="text-secondary-text-color text-sm">서비스 정보를 찾을 수 없습니다.</p>
-        <button onClick={() => navigate('/services')} className="flex items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+        <Link to="/services" className="flex items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
           <ArrowLeft className="w-3 h-3" />
           목록으로
-        </button>
+        </Link>
       </div>
     );
   }
   const isRemoved = service.serviceStatus === 'removed';
+  const portMappings = service.servicePortMappings && service.servicePortMappings.length > 0
+    ? service.servicePortMappings
+    : [{ hostPort: service.serviceHostPort ?? service.servicePort, containerPort: service.serviceContainerPort ?? service.servicePort }];
 
   async function handleStartService() {
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/start`, { method: 'POST' }, logout);
+      const res = await apiFetch(`/v1/service/${serviceIndex}/start`, { method: 'POST' }, logout);
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
@@ -122,7 +147,7 @@ export default function ServiceDetail() {
 
   async function handleStopService() {
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/stop`, { method: 'POST' }, logout);
+      const res = await apiFetch(`/v1/service/${serviceIndex}/stop`, { method: 'POST' }, logout);
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
@@ -132,7 +157,7 @@ export default function ServiceDetail() {
   async function handleContainerAction(containerName: string, action: 'start' | 'stop' | 'restart') {
     if (!serviceIndex) return;
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/containers/${encodeURIComponent(containerName)}/${action}`, { method: 'POST' }, logout);
+      const res = await apiFetch(`/v1/service/${serviceIndex}/containers/${encodeURIComponent(containerName)}/${action}`, { method: 'POST' }, logout);
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
@@ -146,7 +171,7 @@ export default function ServiceDetail() {
       return;
     }
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}/subdomain`, {
+      const res = await apiFetch(`/v1/service/${serviceIndex}/subdomain`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain: value === '' ? null : value }),
@@ -167,7 +192,7 @@ export default function ServiceDetail() {
   async function deleteService(deleteScope: 'containers' | 'service') {
     if (!service) return;
     try {
-      const res = await apiFetch(`/v1/workspace/services/${serviceIndex}`, {
+      const res = await apiFetch(`/v1/service/${serviceIndex}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deleteScope }),
@@ -214,14 +239,9 @@ export default function ServiceDetail() {
     ));
   }
 
-  const sourceUrls: string[] = (() => {
+  const sourceRepositories = (() => {
     if (!service.serviceSourceUrl) return [];
-    try {
-      const parsed = JSON.parse(service.serviceSourceUrl);
-      return Array.isArray(parsed) ? parsed : [service.serviceSourceUrl];
-    } catch {
-      return [service.serviceSourceUrl];
-    }
+    return parseSourceRepositories(service.serviceSourceUrl);
   })();
 
   const tabs: { key: TabKey; label: string }[] = [
@@ -234,13 +254,13 @@ export default function ServiceDetail() {
     <div className="flex h-full min-h-0 flex-col overflow-hidden pt-20 text-primary-text-color">
 
       {/* 뒤로가기 */}
-      <button
-        onClick={() => navigate('/services')}
+      <Link
+        to="/services"
         className="mb-4 flex w-fit shrink-0 items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
       >
         <ArrowLeft className="w-3 h-3" />
         목록으로
-      </button>
+      </Link>
 
       {/* 헤더: 정체성 + 제어 */}
       <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
@@ -307,35 +327,31 @@ export default function ServiceDetail() {
           <div className="overflow-y-auto pr-1">
             <InfoRow label="버전">v{service.serviceVersion}</InfoRow>
             <InfoRow label="포트">
-              <span className="font-mono">
-                :{service.serviceHostPort ?? service.servicePort}
-                {(service.serviceContainerPort ?? service.servicePort) !== (service.serviceHostPort ?? service.servicePort)
-                  ? ` -> :${service.serviceContainerPort ?? service.servicePort}`
-                  : ''}
-              </span>
+              <div className="flex flex-col gap-1 font-mono">
+                {portMappings.map(mapping => (
+                  <span key={`${mapping.hostPort}:${mapping.containerPort}`}>:{mapping.hostPort} -&gt; :{mapping.containerPort}</span>
+                ))}
+              </div>
             </InfoRow>
             <InfoRow label="에이전트">
               {service.agentName ?? <span className="text-secondary-text-color/50">미연결</span>}
             </InfoRow>
             <InfoRow label="소스">
-              {sourceUrls.length === 0
+              {sourceRepositories.length === 0
                 ? <span className="text-secondary-text-color/50">없음</span>
                 : (
                   <div className="flex flex-col gap-0.5">
-                    {sourceUrls.map((url, i) => (
+                    {sourceRepositories.map((source, i) => (
                       <div key={i} className="flex items-center gap-1.5 text-secondary-text-color/80">
                         <GitBranch className="w-3 h-3 shrink-0" />
-                        <span className="font-mono truncate">{url}</span>
+                        <span className="font-mono truncate">
+                          {source.url}{source.rootDirectory ? ` / ${source.rootDirectory}` : ''}
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
             </InfoRow>
-            {service.serviceRootDirectory && (
-              <InfoRow label="루트 디렉터리">
-                <span className="font-mono">{service.serviceRootDirectory}</span>
-              </InfoRow>
-            )}
             <InfoRow label="서브도메인">
               <div className="flex items-center gap-1.5">
                 <Globe className="w-3 h-3 shrink-0 text-secondary-text-color/60" />

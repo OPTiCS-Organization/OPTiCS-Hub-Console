@@ -11,12 +11,23 @@ export interface ContainerCounts {
   total: number;
 }
 
+export interface ServicePortMapping {
+  hostPort: number;
+  containerPort: number;
+}
+
+export interface SourceRepository {
+  url: string;
+  rootDirectory?: string | null;
+}
+
 export interface ServiceItem {
   serviceIndex: number;
   serviceName: string;
   servicePort: number;
   serviceHostPort?: number;
   serviceContainerPort?: number;
+  servicePortMappings?: ServicePortMapping[];
   serviceSourceUrl: string;
   serviceRootDirectory?: string | null;
   serviceEnv?: Record<string, string>;

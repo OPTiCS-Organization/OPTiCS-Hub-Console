@@ -154,7 +154,7 @@ export default function CreateWorkspaceModal() {
       <div className="flex items-center justify-end gap-2 pt-1">
         <button
           type="button"
-          onClick={closeModal}
+          onClick={() => closeModal()}
           disabled={isSubmitting}
           className="px-4 py-1.5 rounded-sm text-sm text-secondary-text-color hover:text-primary-text-color border border-border-color hover:border-border-color/80 hover:bg-white/5 transition-colors duration-100 cursor-pointer disabled:opacity-50"
         >

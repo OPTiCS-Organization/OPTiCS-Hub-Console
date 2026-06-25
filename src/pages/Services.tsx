@@ -45,7 +45,7 @@ export default function Services() {
     if (!currentWorkspace) return;
     setLoading(true);
     try {
-      const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/services`, {}, logout);
+      const res = await apiFetch(`/v1/service/workspace/${currentWorkspace.workspaceIndex}`, {}, logout);
       const body = await res.json() as { data: { services: ServiceItem[] } };
       const nextServices = body.data.services;
       setServices(nextServices);
@@ -147,7 +147,7 @@ export default function Services() {
             <div
               key={service.serviceIndex}
               onClick={() => navigate(`/services/${service.serviceIndex}`, { state: { service } })}
-              className="cursor-pointer rounded-md border border-border-color hover:border-service-color transition-colors duration-100"
+              className="h-full cursor-pointer rounded-md border border-border-color hover:border-service-color transition-colors duration-100"
             >
               <ServiceCard service={service} containerCounts={containerCounts.get(service.serviceIndex)} />
             </div>

@@ -2,9 +2,38 @@ import { GitBranch, Package } from "lucide-react";
 import type { ContainerCounts, ServiceItem } from "../../interfaces/ServiceItem.interface";
 import { statusDot, statusLabel, presetLabel } from "../../constants/service";
 
+function parseSourceRepositories(raw: string) {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.map((entry) => {
+        if (typeof entry === 'string') return { url: entry, rootDirectory: null };
+        if (entry && typeof entry === 'object') {
+          const record = entry as Record<string, unknown>;
+          return {
+            url: String(record.url ?? record.sourceUrl ?? ''),
+            rootDirectory: record.rootDirectory ? String(record.rootDirectory) : null,
+          };
+        }
+        return { url: '', rootDirectory: null };
+      }).filter(entry => entry.url);
+    }
+  } catch {
+    // fall through
+  }
+  return [{ url: raw, rootDirectory: null }];
+}
+
 export default function ServiceCard({ service, containerCounts }: { service: ServiceItem; containerCounts?: ContainerCounts }) {
+  const portMappings = service.servicePortMappings && service.servicePortMappings.length > 0
+    ? service.servicePortMappings
+    : [{ hostPort: service.serviceHostPort ?? service.servicePort, containerPort: service.serviceContainerPort ?? service.servicePort }];
+  const sourceRepositories = service.serviceSourceUrl ? parseSourceRepositories(service.serviceSourceUrl) : [];
+  const visibleSources = sourceRepositories.slice(0, 2);
+  const hiddenSourceCount = Math.max(sourceRepositories.length - visibleSources.length, 0);
+
   return (
-    <div className="border border-border-color rounded-md bg-modal-box-color overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border-color bg-modal-box-color">
       <div className="px-4 py-4 flex items-start gap-3">
         <div className="relative w-9 h-9 rounded-md bg-white/5 flex items-center justify-center shrink-0">
           <Package className="w-4.5 h-4.5 text-secondary-text-color" />
@@ -34,27 +63,36 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
         </div>
       </div>
 
-      <div className="px-4 pb-3 flex flex-col gap-1.5">
-        {service.serviceSourceUrl && (() => {
-          let urls: string[];
-          try { urls = JSON.parse(service.serviceSourceUrl); if (!Array.isArray(urls)) urls = [service.serviceSourceUrl]; }
-          catch { urls = [service.serviceSourceUrl]; }
-          return urls.map((url, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-xs text-secondary-text-color/70">
+      <div className="flex min-h-[54px] flex-col gap-1.5 px-4 pb-3">
+        {visibleSources.length > 0 ? (
+          <>
+            {visibleSources.map((source, i) => (
+              <div key={i} className="flex min-w-0 items-center gap-1.5 text-xs text-secondary-text-color/70">
+                <GitBranch className="w-3 h-3 shrink-0" />
+                <span className="min-w-0 truncate font-mono">
+                  {source.url}{source.rootDirectory ? ` / ${source.rootDirectory}` : ''}
+                </span>
+              </div>
+            ))}
+            {hiddenSourceCount > 0 && (
+              <div className="flex items-center gap-1.5 text-[11px] text-tertiary-text-color">
+                <GitBranch className="w-3 h-3 shrink-0" />
+                <span className="font-mono">+{hiddenSourceCount} repositories</span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-secondary-text-color/50">
               <GitBranch className="w-3 h-3 shrink-0" />
-              <span className="font-mono truncate">{url}</span>
-            </div>
-          ));
-        })()}
+            <span>소스 없음</span>
+          </div>
+        )}
       </div>
 
-      <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
+      <div className="mt-auto flex items-center justify-between border-t border-border-color px-4 py-2.5">
         <span className="text-secondary-text-color/60 text-[10px] font-mono">v{service.serviceVersion}</span>
         <span className="text-secondary-text-color/60 text-[10px]">
-          :{service.serviceHostPort ?? service.servicePort}
-          {(service.serviceContainerPort ?? service.servicePort) !== (service.serviceHostPort ?? service.servicePort)
-            ? ` -> :${service.serviceContainerPort ?? service.servicePort}`
-            : ''}
+          {portMappings.map(mapping => `:${mapping.hostPort} -> :${mapping.containerPort}`).join(', ')}
         </span>
       </div>
     </div>
