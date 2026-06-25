@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2, Plus, X } from "lucide-react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2, Plus, Server, X } from "lucide-react";
 import { apiFetch } from "../../lib/apiFetch";
 import { useAuth } from "../../context/Auth.context";
 import { useModal } from "../../context/Modal.context";
@@ -505,6 +505,35 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     return (
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
+          <label className={compactLabelCls}>배포 대상 에이전트 <span className="text-service-color">*</span></label>
+          {agents.length === 0 ? (
+            <p className="rounded-sm border border-border-color bg-modal-box-color px-3 py-2 text-xs text-secondary-text-color">연결된 에이전트가 없습니다.</p>
+          ) : (
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {agents.map(agent => {
+                const selected = form.agentIndex === String(agent.agentIndex);
+                return (
+                  <button
+                    key={agent.agentIndex}
+                    type="button"
+                    onClick={() => set('agentIndex', String(agent.agentIndex))}
+                    className={`flex min-w-0 items-center gap-2 rounded-sm border px-2.5 py-2 text-left transition-colors cursor-pointer ${
+                      selected
+                        ? 'border-service-color bg-service-color/10 text-primary-text-color'
+                        : 'border-border-color bg-modal-box-color text-secondary-text-color hover:border-border-strong-color hover:text-primary-text-color'
+                    }`}
+                  >
+                    <Server className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-service-color' : 'text-tertiary-text-color'}`} />
+                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{agent.agentName}</span>
+                    {selected && <Check className="h-3.5 w-3.5 shrink-0 text-service-color" />}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2.5">
             <label className={compactLabelCls}>포트 매핑 <span className="text-service-color">*</span></label>
             <button type="button" onClick={addPortMapping} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
@@ -552,15 +581,10 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
             <input className={compactInputCls} placeholder="1.0.0" value={form.serviceVersion} onChange={e => set('serviceVersion', e.target.value)} required />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className={compactLabelCls}>에이전트 <span className="text-service-color">*</span></label>
-            {agents.length === 0
-              ? <p className="rounded-sm border border-border-color bg-modal-box-color px-3 py-2 text-xs text-secondary-text-color">연결된 에이전트가 없습니다.</p>
-              : (
-                <select className={compactInputCls} value={form.agentIndex} onChange={e => set('agentIndex', e.target.value)}>
-                  {agents.map(agent => <option key={agent.agentIndex} value={agent.agentIndex}>{agent.agentName}</option>)}
-                </select>
-              )
-            }
+            <label className={compactLabelCls}>선택된 에이전트</label>
+            <div className="flex h-8 items-center rounded-sm border border-border-color bg-modal-box-color px-2.5 text-xs text-secondary-text-color">
+              <span className="truncate">{selectedAgent?.agentName ?? '미선택'}</span>
+            </div>
           </div>
         </div>
       </div>
