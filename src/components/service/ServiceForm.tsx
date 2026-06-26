@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronLeft, ChevronRight, Loader2, Plus, Server, X } from "lucide-react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, GitBranch, Loader2, Plus, Server, X } from "lucide-react";
 import { apiFetch } from "../../lib/apiFetch";
 import { useAuth } from "../../context/Auth.context";
 import { useModal } from "../../context/Modal.context";
@@ -31,9 +31,56 @@ const createSteps: { key: CreateStep; label: string }[] = [
   { key: 'review', label: '확인' },
 ];
 
-const compactInputCls = "h-8 w-full rounded-sm border border-border-color bg-modal-box-color px-2.5 text-xs text-primary-text-color placeholder:text-secondary-text-color/40 outline-none transition-colors duration-100 focus:border-service-color";
+const stepMeta: Record<CreateStep, { title: string; description: string }> = {
+  source: {
+    title: '소스 연결',
+    description: '서비스 이름과 배포할 GitHub 레포지토리를 지정합니다.',
+  },
+  runtime: {
+    title: '배포 설정',
+    description: '에이전트, 포트, 버전처럼 실행에 필요한 값을 정리합니다.',
+  },
+  env: {
+    title: '환경 변수',
+    description: '.env 내용을 붙여넣거나 필요한 키를 직접 추가합니다.',
+  },
+  review: {
+    title: '최종 확인',
+    description: '입력한 내용을 확인한 뒤 배포를 시작합니다.',
+  },
+};
+
+const compactInputCls = "h-9 w-full rounded-sm border border-border-color bg-background-color px-2.5 text-xs text-primary-text-color placeholder:text-secondary-text-color/40 outline-none transition-colors duration-100 focus:border-service-color";
 const compactValidInputCls = "border-success-color/60 bg-success-color/5";
 const compactLabelCls = "text-[10px] font-medium uppercase tracking-wider text-secondary-text-color";
+
+function FormSection({ title, description, action, modified, compact, children }: { title: string; description?: string; action?: React.ReactNode; modified?: boolean; compact?: boolean; children?: React.ReactNode }) {
+  const hasBody = children !== null && children !== undefined && children !== false;
+
+  return (
+    <section className="rounded-sm border border-border-color bg-modal-box-color/45">
+      <div className={`flex items-start justify-between gap-3 ${hasBody ? 'border-b border-border-color/60' : ''} ${compact ? 'px-2.5 py-2' : 'px-3 py-2.5'}`}>
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <h3 className="text-xs font-semibold text-primary-text-color">{title}</h3>
+            {modified && (
+              <span className="shrink-0 rounded-sm border border-service-color/25 bg-service-color/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-service-color">
+                Modified
+              </span>
+            )}
+          </div>
+          {description && <p className="mt-0.5 text-[11px] leading-relaxed text-secondary-text-color">{description}</p>}
+        </div>
+        {action}
+      </div>
+      {hasBody && (
+        <div className={compact ? 'p-2.5' : 'p-3'}>
+          {children}
+        </div>
+      )}
+    </section>
+  );
+}
 
 function normalizeRootDirectory(value?: string | null) {
   return (value ?? '').trim().replace(/^\/+/, '');
@@ -122,6 +169,19 @@ function initialPortMappings(service?: ServiceItem): PortMappingEntry[] {
   }];
 }
 
+function cleanSourceRepositories(entries: SourceRepositoryEntry[]) {
+  return entries.map(repo => ({
+    url: repo.url.trim(),
+    rootDirectory: normalizeRootDirectory(repo.rootDirectory),
+  }));
+}
+
+function cleanEnvEntries(entries: EnvEntry[]) {
+  return entries
+    .filter(entry => entry.key.trim() || entry.value.trim())
+    .map(entry => ({ key: entry.key.trim(), value: entry.value }));
+}
+
 function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2.5 border-b border-border-color/50 py-2 last:border-0">
@@ -154,6 +214,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     return entries.length > 0 ? entries : [{ key: '', value: '' }];
   });
   const [currentStep, setCurrentStep] = useState<CreateStep>('source');
+  const [redeployEnvExpanded, setRedeployEnvExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -168,6 +229,41 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
   const currentStepIndex = createSteps.findIndex(step => step.key === currentStep);
   const selectedAgent = agents.find(agent => String(agent.agentIndex) === form.agentIndex);
   const envWithKeys = envEntries.filter(entry => entry.key.trim());
+  const initialForm = useMemo(() => ({
+    serviceName: service?.serviceName ?? '',
+    serviceVersion: service?.serviceVersion ?? '1.0.0',
+    serviceDeployPreset: service?.serviceDeployPreset ?? 'dockerfile',
+    agentIndex: service ? String(service.agentIndex) : '',
+  }), [service]);
+  const initialSourceRepositories = useMemo(
+    () => parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory),
+    [service],
+  );
+  const initialPorts = useMemo(() => initialPortMappings(service), [service]);
+  const initialEnvEntries = useMemo(
+    () => Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
+    [service],
+  );
+  const modifiedGroups = useMemo(() => {
+    const basic = form.serviceName !== initialForm.serviceName || form.serviceDeployPreset !== initialForm.serviceDeployPreset;
+    const repositories = JSON.stringify(cleanSourceRepositories(sourceRepositories)) !== JSON.stringify(cleanSourceRepositories(initialSourceRepositories));
+    const agent = form.agentIndex !== initialForm.agentIndex;
+    const ports = JSON.stringify(portMappings) !== JSON.stringify(initialPorts);
+    const release = form.serviceVersion !== initialForm.serviceVersion;
+    const env = JSON.stringify(cleanEnvEntries(envEntries)) !== JSON.stringify(cleanEnvEntries(initialEnvEntries));
+    return { basic, repositories, agent, ports, release, env };
+  }, [envEntries, form, initialEnvEntries, initialForm, initialPorts, initialSourceRepositories, portMappings, sourceRepositories]);
+  const modifiedLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (modifiedGroups.basic) labels.push('기본 정보');
+    if (modifiedGroups.repositories) labels.push('레포지토리');
+    if (modifiedGroups.agent) labels.push('배포 대상');
+    if (modifiedGroups.ports) labels.push('포트');
+    if (modifiedGroups.release) labels.push('릴리즈');
+    if (modifiedGroups.env) labels.push('환경 변수');
+    return labels;
+  }, [modifiedGroups]);
+  const modifiedCount = modifiedLabels.length;
   const initialDirtySnapshot = useMemo(() => JSON.stringify({
     form: {
       serviceName: service?.serviceName ?? '',
@@ -176,7 +272,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       serviceDeployPreset: service?.serviceDeployPreset ?? 'dockerfile',
       agentIndex: service ? String(service.agentIndex) : '',
     },
-    sourceRepositories: parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory),
+    sourceRepositories: cleanSourceRepositories(parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory)),
     portMappings: initialPortMappings(service),
     envEntries: Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
   }), [service]);
@@ -188,7 +284,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       serviceDeployPreset: form.serviceDeployPreset,
       agentIndex: form.agentIndex,
     },
-    sourceRepositories,
+    sourceRepositories: cleanSourceRepositories(sourceRepositories),
     portMappings,
     envEntries: envEntries.filter(entry => entry.key.trim() || entry.value.trim()),
   }), [envEntries, form, portMappings, sourceRepositories]);
@@ -227,8 +323,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
 
   function updateSourceRepository(index: number, field: keyof SourceRepositoryEntry, value: string) {
     setError(null);
-    const normalizedValue = field === 'rootDirectory' ? normalizeRootDirectory(value) : value;
-    setSourceRepositories(prev => prev.map((repo, i) => i === index ? { ...repo, [field]: normalizedValue } : repo));
+    setSourceRepositories(prev => prev.map((repo, i) => i === index ? { ...repo, [field]: value } : repo));
   }
 
   function addSourceRepository() { setSourceRepositories(prev => [...prev, { url: '', rootDirectory: '' }]); }
@@ -437,35 +532,44 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
 
   function renderSourceFields() {
     return (
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_150px]">
-          <div className="flex flex-col gap-1.5">
-            <label className={compactLabelCls}>서비스명 <span className="text-service-color">*</span></label>
-            <input className={compactInputCls} placeholder="my-service" value={form.serviceName} onChange={e => set('serviceName', e.target.value)} autoFocus required />
+      <div className={`flex flex-col ${isCreateMode ? 'gap-3' : 'gap-2.5'}`}>
+        <FormSection title="기본 정보" description="콘솔에서 표시될 서비스 이름과 빌드 방식을 선택합니다." modified={!isCreateMode && modifiedGroups.basic} compact={!isCreateMode}>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[minmax(0,1fr)_150px]">
+            <div className="flex flex-col gap-1.5">
+              <label className={compactLabelCls}>서비스명 <span className="text-service-color">*</span></label>
+              <input className={compactInputCls} placeholder="my-service" value={form.serviceName} onChange={e => set('serviceName', e.target.value)} autoFocus required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={compactLabelCls}>프리셋 <span className="text-service-color">*</span></label>
+              <select className={compactInputCls} value={form.serviceDeployPreset} onChange={e => set('serviceDeployPreset', e.target.value)}>
+                <option value="dockerfile">Dockerfile</option>
+                <option value="compose">Compose</option>
+                <option value="preset_nestjs">NestJS</option>
+              </select>
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className={compactLabelCls}>프리셋 <span className="text-service-color">*</span></label>
-            <select className={compactInputCls} value={form.serviceDeployPreset} onChange={e => set('serviceDeployPreset', e.target.value)}>
-              <option value="dockerfile">Dockerfile</option>
-              <option value="compose">Compose</option>
-              <option value="preset_nestjs">NestJS</option>
-            </select>
-          </div>
-        </div>
+        </FormSection>
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2.5">
-            <label className={compactLabelCls}>소스 URL <span className="text-service-color">*</span></label>
-            <button type="button" onClick={addSourceRepository} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+        <FormSection
+          title="레포지토리"
+          description="여러 레포를 추가하고 각 레포의 루트 디렉터리를 지정할 수 있습니다."
+          modified={!isCreateMode && modifiedGroups.repositories}
+          compact={!isCreateMode}
+          action={(
+            <button type="button" onClick={addSourceRepository} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-sm border border-border-color px-2 text-xs text-secondary-text-color transition-colors hover:border-border-strong-color hover:text-primary-text-color cursor-pointer">
               <Plus className="w-3 h-3" />
-              레포지토리 추가
+              추가
             </button>
-          </div>
-          <div className="flex max-h-48 flex-col gap-2 overflow-y-auto pr-1">
+          )}
+        >
+          <div className="flex max-h-52 flex-col gap-2 overflow-y-auto pr-1">
             {sourceRepositories.map((repo, i) => (
-              <div key={i} className="optics-row-in rounded-sm border border-border-color/70 bg-modal-box-color/55 p-2">
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-medium text-tertiary-text-color">Repository {i + 1}</span>
+              <div key={i} className={`optics-row-in rounded-sm border border-border-color/70 bg-background-color/55 ${isCreateMode ? 'p-2.5' : 'p-2'}`}>
+                <div className={`${isCreateMode ? 'mb-1.5' : 'mb-1'} flex items-center justify-between gap-2`}>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <GitBranch className="h-3.5 w-3.5 shrink-0 text-tertiary-text-color" />
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-tertiary-text-color">Repository {i + 1}</span>
+                  </div>
                   {sourceRepositories.length > 1 && (
                     <button type="button" onClick={() => removeSourceRepository(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
                       <X className="w-3.5 h-3.5" />
@@ -495,21 +599,19 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-secondary-text-color">루트 디렉터리는 앞의 /를 제거해서 저장됩니다.</p>
-        </div>
+        </FormSection>
       </div>
     );
   }
 
   function renderRuntimeFields() {
     return (
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5">
-          <label className={compactLabelCls}>배포 대상 에이전트 <span className="text-service-color">*</span></label>
+      <div className={`flex flex-col ${isCreateMode ? 'gap-3' : 'gap-2.5'}`}>
+        <FormSection title="배포 대상" description="서비스를 실행할 워크스페이스 에이전트를 선택합니다." modified={!isCreateMode && modifiedGroups.agent} compact={!isCreateMode}>
           {agents.length === 0 ? (
-            <p className="rounded-sm border border-border-color bg-modal-box-color px-3 py-2 text-xs text-secondary-text-color">연결된 에이전트가 없습니다.</p>
+            <p className="rounded-sm border border-border-color bg-background-color px-3 py-2 text-xs text-secondary-text-color">연결된 에이전트가 없습니다.</p>
           ) : (
-            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {agents.map(agent => {
                 const selected = form.agentIndex === String(agent.agentIndex);
                 return (
@@ -517,31 +619,45 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                     key={agent.agentIndex}
                     type="button"
                     onClick={() => set('agentIndex', String(agent.agentIndex))}
-                    className={`flex min-w-0 items-center gap-2 rounded-sm border px-2.5 py-2 text-left transition-colors cursor-pointer ${
+                    className={`group flex min-w-0 items-center gap-2 rounded-sm border px-2.5 text-left transition-colors cursor-pointer ${isCreateMode ? 'py-2.5' : 'py-2'} ${
                       selected
                         ? 'border-service-color bg-service-color/10 text-primary-text-color'
-                        : 'border-border-color bg-modal-box-color text-secondary-text-color hover:border-border-strong-color hover:text-primary-text-color'
+                        : 'border-border-color bg-background-color text-secondary-text-color hover:border-border-strong-color hover:text-primary-text-color'
                     }`}
                   >
-                    <Server className={`h-3.5 w-3.5 shrink-0 ${selected ? 'text-service-color' : 'text-tertiary-text-color'}`} />
-                    <span className="min-w-0 flex-1 truncate text-xs font-medium">{agent.agentName}</span>
+                    <div className={`flex shrink-0 items-center justify-center rounded-sm border ${isCreateMode ? 'h-7 w-7' : 'h-6 w-6'} ${selected ? 'border-service-color/30 bg-service-color/15 text-service-color' : 'border-border-color bg-modal-box-color text-tertiary-text-color group-hover:text-secondary-text-color'}`}>
+                      <Server className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium">{agent.agentName}</span>
+                      <span className="mt-0.5 block text-[10px] text-tertiary-text-color">Agent #{agent.agentIndex}</span>
+                    </div>
                     {selected && <Check className="h-3.5 w-3.5 shrink-0 text-service-color" />}
                   </button>
                 );
               })}
             </div>
           )}
-        </div>
+        </FormSection>
 
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between gap-2.5">
-            <label className={compactLabelCls}>포트 매핑 <span className="text-service-color">*</span></label>
-            <button type="button" onClick={addPortMapping} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
+        <FormSection
+          title="포트 매핑"
+          description={isCompose ? 'Compose 배포는 compose 파일의 ports 설정이 우선 적용됩니다.' : '외부 포트가 컨테이너 내부 포트로 연결됩니다.'}
+          modified={!isCreateMode && modifiedGroups.ports}
+          compact={!isCreateMode}
+          action={(
+            <button type="button" onClick={addPortMapping} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-sm border border-border-color px-2 text-xs text-secondary-text-color transition-colors hover:border-border-strong-color hover:text-primary-text-color cursor-pointer">
               <Plus className="w-3 h-3" />
               추가
             </button>
+          )}
+        >
+          <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] gap-2 px-0.5">
+            <span className={compactLabelCls}>외부 포트 <span className="text-service-color">*</span></span>
+            <span className={compactLabelCls}>내부 포트 <span className="text-service-color">*</span></span>
+            <span />
           </div>
-          <div className="flex max-h-32 flex-col gap-1.5 overflow-y-auto pr-1">
+          <div className="flex max-h-36 flex-col gap-1.5 overflow-y-auto pr-1">
             {portMappings.map((mapping, index) => (
               <div key={index} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
                 <input
@@ -570,38 +686,66 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-secondary-text-color">
-            {isCompose ? 'Compose 배포는 compose 파일의 ports 설정이 우선 적용됩니다.' : '외부 포트가 컨테이너 내부 포트로 연결됩니다.'}
-          </p>
-        </div>
+        </FormSection>
 
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <label className={compactLabelCls}>버전 <span className="text-service-color">*</span></label>
-            <input className={compactInputCls} placeholder="1.0.0" value={form.serviceVersion} onChange={e => set('serviceVersion', e.target.value)} required />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className={compactLabelCls}>선택된 에이전트</label>
-            <div className="flex h-8 items-center rounded-sm border border-border-color bg-modal-box-color px-2.5 text-xs text-secondary-text-color">
-              <span className="truncate">{selectedAgent?.agentName ?? '미선택'}</span>
+        <FormSection title="릴리즈 정보" description="이번 배포에서 표시될 버전을 입력합니다." modified={!isCreateMode && modifiedGroups.release} compact={!isCreateMode}>
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className={compactLabelCls}>버전 <span className="text-service-color">*</span></label>
+              <input className={compactInputCls} placeholder="1.0.0" value={form.serviceVersion} onChange={e => set('serviceVersion', e.target.value)} required />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className={compactLabelCls}>선택된 에이전트</label>
+              <div className="flex h-9 items-center gap-2 rounded-sm border border-border-color bg-background-color px-2.5 text-xs text-secondary-text-color">
+                <Server className="h-3.5 w-3.5 shrink-0 text-tertiary-text-color" />
+                <span className="truncate">{selectedAgent?.agentName ?? '미선택'}</span>
+              </div>
             </div>
           </div>
-        </div>
+        </FormSection>
       </div>
     );
   }
 
   function renderEnvFields() {
+    const isCollapsed = !isCreateMode && !redeployEnvExpanded;
+
     return (
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between gap-2.5">
-          <label className={compactLabelCls}>환경 변수</label>
-          <button type="button" onClick={addEnvEntry} className="flex items-center gap-1 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
-            <Plus className="w-3 h-3" />
-            추가
-          </button>
+      <FormSection
+        title="환경 변수"
+        description={isCollapsed ? `${envWithKeys.length}개의 환경 변수가 설정되어 있습니다.` : ".env 형식의 여러 줄을 붙여넣으면 자동으로 행이 채워집니다."}
+        modified={!isCreateMode && modifiedGroups.env}
+        compact={!isCreateMode}
+        action={(
+          <div className="flex shrink-0 items-center gap-1.5">
+            {!isCreateMode && (
+              <button
+                type="button"
+                onClick={() => setRedeployEnvExpanded(open => !open)}
+                className="inline-flex h-7 items-center rounded-sm border border-border-color px-2 text-xs text-secondary-text-color transition-colors hover:border-border-strong-color hover:text-primary-text-color cursor-pointer"
+              >
+                {isCollapsed ? '편집' : '접기'}
+              </button>
+            )}
+            {!isCollapsed && (
+              <button type="button" onClick={addEnvEntry} className="inline-flex h-7 items-center gap-1 rounded-sm border border-border-color px-2 text-xs text-secondary-text-color transition-colors hover:border-border-strong-color hover:text-primary-text-color cursor-pointer">
+                <Plus className="w-3 h-3" />
+                추가
+              </button>
+            )}
+          </div>
+        )}
+      >
+        {isCollapsed ? (
+          null
+        ) : (
+          <>
+        <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] gap-2 px-0.5">
+          <span className={compactLabelCls}>Key</span>
+          <span className={compactLabelCls}>Value</span>
+          <span />
         </div>
-        <div className="flex max-h-48 flex-col gap-1.5 overflow-y-auto pr-1">
+        <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1">
           {envEntries.map((entry, i) => (
             <div key={i} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
               <input
@@ -624,10 +768,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
             </div>
           ))}
         </div>
-        <p className="text-[11px] leading-relaxed text-secondary-text-color">
-          .env 내용을 붙여넣으면 여러 줄이 자동으로 입력됩니다.
-        </p>
-      </div>
+          </>
+        )}
+      </FormSection>
     );
   }
 
@@ -636,29 +779,31 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       .map(repo => ({ url: repo.url.trim(), rootDirectory: normalizeRootDirectory(repo.rootDirectory) }))
       .filter(repo => repo.url);
     return (
-      <div className="optics-panel-in rounded-sm border border-border-color bg-modal-box-color px-3 py-1">
-        <SummaryRow label="서비스명" value={form.serviceName.trim() || <span className="text-secondary-text-color">미입력</span>} />
-        <SummaryRow label="소스" value={
-          <div className="flex flex-col gap-1">
-            {repositories.map(repo => (
-              <span key={`${repo.url}:${repo.rootDirectory}`} className="truncate font-mono text-[11px] text-secondary-text-color">
-                {repo.url}{repo.rootDirectory ? ` / ${repo.rootDirectory}` : ''}
-              </span>
-            ))}
-          </div>
-        } />
-        <SummaryRow label="프리셋" value={form.serviceDeployPreset} />
-        <SummaryRow label="포트" value={
-          <div className="flex flex-col gap-1 font-mono">
-            {portMappings.map(mapping => (
-              <span key={`${mapping.hostPort}:${mapping.containerPort}`}>:{mapping.hostPort} -&gt; :{mapping.containerPort}</span>
-            ))}
-          </div>
-        } />
-        <SummaryRow label="버전" value={`v${form.serviceVersion.trim()}`} />
-        <SummaryRow label="에이전트" value={selectedAgent?.agentName ?? <span className="text-secondary-text-color">미선택</span>} />
-        <SummaryRow label="환경 변수" value={`${envWithKeys.length}개`} />
-      </div>
+      <FormSection title="배포 요약" description="아래 내용으로 서비스 배포를 시작합니다.">
+        <div className="rounded-sm border border-border-color bg-background-color px-3 py-1">
+          <SummaryRow label="서비스명" value={form.serviceName.trim() || <span className="text-secondary-text-color">미입력</span>} />
+          <SummaryRow label="소스" value={
+            <div className="flex flex-col gap-1">
+              {repositories.map(repo => (
+                <span key={`${repo.url}:${repo.rootDirectory}`} className="truncate font-mono text-[11px] text-secondary-text-color">
+                  {repo.url}{repo.rootDirectory ? ` / ${repo.rootDirectory}` : ''}
+                </span>
+              ))}
+            </div>
+          } />
+          <SummaryRow label="프리셋" value={form.serviceDeployPreset} />
+          <SummaryRow label="포트" value={
+            <div className="flex flex-col gap-1 font-mono">
+              {portMappings.map(mapping => (
+                <span key={`${mapping.hostPort}:${mapping.containerPort}`}>:{mapping.hostPort} -&gt; :{mapping.containerPort}</span>
+              ))}
+            </div>
+          } />
+          <SummaryRow label="버전" value={`v${form.serviceVersion.trim()}`} />
+          <SummaryRow label="에이전트" value={selectedAgent?.agentName ?? <span className="text-secondary-text-color">미선택</span>} />
+          <SummaryRow label="환경 변수" value={`${envWithKeys.length}개`} />
+        </div>
+      </FormSection>
     );
   }
 
@@ -671,11 +816,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
 
   function renderRedeployFields() {
     return (
-      <>
+      <div className="flex flex-col gap-2.5">
         {renderSourceFields()}
         {renderRuntimeFields()}
         {renderEnvFields()}
-      </>
+      </div>
     );
   }
 
@@ -683,58 +828,70 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
   const isReviewStep = !isCreateMode || currentStep === 'review';
 
   return (
-    <form onSubmit={e => e.preventDefault()} className="flex flex-col gap-3.5">
+    <form onSubmit={e => e.preventDefault()} className={`flex flex-col ${isCreateMode ? 'gap-3.5' : 'gap-3'}`}>
       {isCreateMode && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-medium uppercase tracking-widest text-tertiary-text-color">
-                Step {currentStepIndex + 1} / {createSteps.length}
-              </span>
-              <p className="mt-0.5 text-[13px] font-semibold text-primary-text-color">
-                {createSteps[currentStepIndex].label}
-              </p>
+        <div className="border-b border-border-color/70 pb-2.5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-[10px] font-medium uppercase tracking-widest text-tertiary-text-color">Step {currentStepIndex + 1} / {createSteps.length}</div>
+              <p className="mt-0.5 text-[13px] font-semibold text-primary-text-color">{stepMeta[currentStep].title}</p>
+              <p className="mt-0.5 text-[10px] leading-relaxed text-secondary-text-color">{stepMeta[currentStep].description}</p>
             </div>
-            <div className="hidden items-center gap-1 text-[11px] text-tertiary-text-color sm:flex">
-              {createSteps.map((step, index) => (
-                <button
-                  key={step.key}
-                  type="button"
-                  onClick={() => goToStep(step.key)}
-                  className={`px-1.5 py-0.5 transition-colors cursor-pointer ${
-                    index === currentStepIndex
-                      ? 'text-primary-text-color'
-                      : index < currentStepIndex
-                        ? 'text-secondary-text-color hover:text-primary-text-color'
-                        : 'text-tertiary-text-color hover:text-secondary-text-color'
-                  }`}
-                >
-                  {step.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="grid grid-cols-4 gap-1">
-            {createSteps.map((step, index) => (
-              <button
-                key={step.key}
-                type="button"
-                onClick={() => goToStep(step.key)}
-                aria-label={step.label}
-                className={`h-1.5 rounded-full transition-colors cursor-pointer ${
-                  index < currentStepIndex
-                    ? 'bg-service-color'
-                    : index === currentStepIndex
-                      ? 'optics-step-active bg-service-color'
-                      : 'bg-border-color hover:bg-border-strong-color'
-                }`}
+
+            <div className="relative mt-1.5 w-[104px] shrink-0 px-1">
+              <div className="absolute left-1.5 right-1.5 top-[7px] h-px bg-border-color" />
+              <div
+                className="absolute left-1.5 top-[7px] h-px bg-service-color/80 transition-all duration-200"
+                style={{ width: `${currentStepIndex === 0 ? 0 : (currentStepIndex / (createSteps.length - 1)) * 100}%` }}
               />
-            ))}
+              <div className="relative grid grid-cols-4">
+                {createSteps.map((step, index) => {
+                  const isCurrent = index === currentStepIndex;
+                  const isDone = index < currentStepIndex;
+                  return (
+                    <button
+                      key={step.key}
+                      type="button"
+                      onClick={() => goToStep(step.key)}
+                      aria-label={step.label}
+                      className="group flex min-w-0 justify-center cursor-pointer"
+                    >
+                      <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border bg-modal-background-color transition-colors ${
+                        isCurrent
+                          ? 'border-service-color text-service-color'
+                          : isDone
+                            ? 'border-service-color/70 text-service-color'
+                          : 'border-border-color text-tertiary-text-color group-hover:border-border-strong-color group-hover:text-secondary-text-color'
+                      }`}>
+                        {isDone ? <Check className="h-2 w-2" /> : <span className={`h-1 w-1 rounded-full ${isCurrent ? 'bg-service-color' : 'bg-current'}`} />}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      <div key={isCreateMode ? currentStep : 'redeploy'} className="optics-panel-in min-h-[218px]">
+      {!isCreateMode && (
+        <div className="rounded-sm border border-border-color bg-modal-box-color/45 px-3 py-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className="block text-[10px] font-medium uppercase leading-3 tracking-widest text-tertiary-text-color">Redeploy</span>
+              <p className="mt-1 truncate text-sm font-semibold leading-4 text-primary-text-color">{form.serviceName || service?.serviceName || '서비스 재배포'}</p>
+              <p className="mt-1 text-[11px] leading-3 text-secondary-text-color">
+                {modifiedCount > 0 ? `${modifiedLabels.join(', ')} 변경 후 재배포합니다.` : '변경 사항 없이 다시 빌드 후 배포합니다.'}
+              </p>
+            </div>
+            <div className="flex h-6 shrink-0 items-center rounded-sm border border-border-color bg-background-color px-2 text-[10px] font-medium leading-none text-secondary-text-color">
+              {modifiedCount > 0 ? `변경 ${modifiedCount}개` : '변경 없음'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div key={isCreateMode ? currentStep : 'redeploy'} className={`optics-panel-in ${isCreateMode ? 'min-h-[248px]' : 'max-h-[58vh] overflow-y-auto pr-1'}`}>
         {isCreateMode ? renderCreateStep() : renderRedeployFields()}
       </div>
 
@@ -765,6 +922,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           >
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {submitLabel}
+            {!isCreateMode && (
+              <span className="rounded-sm bg-white/15 px-1.5 py-0.5 text-[10px] font-medium">
+                {modifiedCount > 0 ? `변경 ${modifiedCount}개` : '동일'}
+              </span>
+            )}
           </button>
         ) : (
           <button

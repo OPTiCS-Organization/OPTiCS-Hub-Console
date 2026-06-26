@@ -16,6 +16,24 @@ export interface ServicePortMapping {
   containerPort: number;
 }
 
+export interface ServiceComponent {
+  componentIndex: number;
+  componentName: string;
+  containerName?: string | null;
+  status: 'waiting' | 'building' | 'starting' | 'running' | 'stopped' | 'failed' | 'removed' | 'restarting';
+  health?: string | null;
+  exitCode?: number | null;
+  updatedAt: string;
+}
+
+export interface ServiceEndpoint {
+  endpointIndex: number;
+  componentName?: string | null;
+  subdomain?: string | null;
+  hostPort: number;
+  containerPort: number;
+}
+
 export interface SourceRepository {
   url: string;
   rootDirectory?: string | null;
@@ -41,4 +59,6 @@ export interface ServiceItem {
   agentName: string | null;
   agentUuid: string | null;
   containers?: ContainerState[];
+  components?: ServiceComponent[];
+  endpoints?: ServiceEndpoint[];
 }

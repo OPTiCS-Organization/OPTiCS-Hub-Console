@@ -6,6 +6,8 @@ import { apiFetch } from "../lib/apiFetch";
 import { Loader2 } from "lucide-react";
 
 const NAME_REGEX = /^[a-zA-Z0-9\-_]+$/;
+const SUBDOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+const RESERVED_WORKSPACE_SUBDOMAINS = new Set(["api", "docs", "console", "admin", "tunnel", "proxy"]);
 
 type NameStatus = "idle" | "checking" | "valid" | "invalid";
 
@@ -15,6 +17,7 @@ export default function CreateWorkspaceModal() {
   const { logout } = useAuth();
 
   const [name, setName] = useState("");
+  const [subdomain, setSubdomain] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,14 +85,22 @@ export default function CreateWorkspaceModal() {
 
   const isNameValid = nameStatus === "valid";
 
+  const trimmedSubdomain = subdomain.trim();
+  const subdomainError =
+    trimmedSubdomain !== "" && RESERVED_WORKSPACE_SUBDOMAINS.has(trimmedSubdomain)
+      ? "예약된 서브도메인입니다."
+      : trimmedSubdomain !== "" && (trimmedSubdomain.length > 63 || !SUBDOMAIN_REGEX.test(trimmedSubdomain))
+      ? "서브도메인은 소문자/숫자/하이픈(-)만 사용할 수 있습니다."
+      : null;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!isNameValid || isSubmitting) return;
+    if (!isNameValid || subdomainError !== null || isSubmitting) return;
 
     setError(null);
     setIsSubmitting(true);
     try {
-      await createWorkspace(trimmed);
+      await createWorkspace(trimmed, trimmedSubdomain === "" ? null : trimmedSubdomain);
       closeModal();
     } catch (err) {
       setError(err instanceof Error ? err.message : "죄송합니다. 알 수 없는 에러가 발생했습니다.");
@@ -128,6 +139,24 @@ export default function CreateWorkspaceModal() {
         </div>
       </div>
 
+      {/* Subdomain */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-xs text-secondary-text-color font-medium uppercase tracking-widest">서브도메인 <span className="text-secondary-text-color/50 normal-case tracking-normal font-normal">(Optional)</span>
+        </label>
+        <input
+          type="text"
+          value={subdomain}
+          onChange={e => setSubdomain(e.target.value)}
+          placeholder="Ex. my-team"
+          maxLength={63}
+          className={`w-full rounded-sm bg-modal-box-color border px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none transition-colors duration-100 ${subdomainError ? "border-red-500 focus:border-red-500" : "border-border-color focus:border-service-color"}`}
+        />
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] text-red-400">{subdomainError ?? "　"}</span>
+          <span className="text-[10px] text-secondary-text-color">{subdomain.length} / 63</span>
+        </div>
+      </div>
+
       {/* Description */}
       <div className="flex flex-col gap-1.5">
         <label className="text-xs text-secondary-text-color font-medium uppercase tracking-widest">설명 <span className="text-secondary-text-color/50 normal-case tracking-normal font-normal">(Optional)</span>
@@ -162,7 +191,7 @@ export default function CreateWorkspaceModal() {
         </button>
         <button
           type="submit"
-          disabled={!isNameValid || isSubmitting}
+          disabled={!isNameValid || subdomainError !== null || isSubmitting}
           className="flex items-center gap-2 px-4 py-1.5 rounded-sm text-sm font-semibold bg-service-color hover:bg-button-progress-color text-white transition-colors duration-100 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isSubmitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}

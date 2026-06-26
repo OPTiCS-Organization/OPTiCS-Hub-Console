@@ -13,11 +13,10 @@ import LogPanel from "../components/service/LogPanel";
 
 type TabKey = 'overview' | 'containers' | 'logs';
 
-const SERVICE_DOMAIN = import.meta.env.VITE_SERVICE_DOMAIN as string;
-
-// 서브도메인 → 접속 가능한 전체 URL (예: hwplace → https://hwplace.service.optics.run/)
-function buildServiceUrl(subdomain: string): string {
-  return `https://${subdomain}.${SERVICE_DOMAIN}/`;
+// 서비스 서브도메인 + 워크스페이스 서브도메인 → 접속 가능한 전체 URL
+function buildServiceUrl(serviceSubdomain: string, workspaceSubdomain: string): string {
+  if (serviceSubdomain === '') return `https://${workspaceSubdomain}.optics.run/`;
+  return `https://${serviceSubdomain}.${workspaceSubdomain}.optics.run/`;
 }
 
 function parseSourceRepositories(raw: string) {
@@ -132,9 +131,16 @@ export default function ServiceDetail() {
     );
   }
   const isRemoved = service.serviceStatus === 'removed';
+  const serviceSubdomain = service.serviceSubdomain ?? null;
+  const hasServiceSubdomain = serviceSubdomain !== null;
+  const serviceUrl = hasServiceSubdomain && currentWorkspace?.workspaceSubdomain && currentWorkspace.workspaceSubdomainActive
+    ? buildServiceUrl(serviceSubdomain, currentWorkspace.workspaceSubdomain)
+    : null;
   const portMappings = service.servicePortMappings && service.servicePortMappings.length > 0
     ? service.servicePortMappings
     : [{ hostPort: service.serviceHostPort ?? service.servicePort, containerPort: service.serviceContainerPort ?? service.servicePort }];
+  const endpoints = service.endpoints ?? [];
+  const components = service.components ?? [];
 
   async function handleStartService() {
     try {
@@ -165,22 +171,24 @@ export default function ServiceDetail() {
   }
 
   async function handleSaveSubdomain() {
-    const value = subdomainInput.trim();
-    if (value !== '' && (value.length > 63 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(value))) {
-      setSubdomainError('소문자/숫자/하이픈만 사용할 수 있습니다.');
+    const rawValue = subdomainInput.trim().toLowerCase();
+    if (rawValue !== '' && rawValue !== '@' && (rawValue.length > 63 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(rawValue))) {
+      setSubdomainError('소문자/숫자/하이픈 또는 @만 사용할 수 있습니다.');
       return;
     }
     try {
       const res = await apiFetch(`/v1/service/${serviceIndex}/subdomain`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain: value === '' ? null : value }),
+        body: JSON.stringify({ subdomain: rawValue === '' ? null : rawValue }),
       }, logout);
       if (!res.ok) {
         setSubdomainError(res.status === 409 ? '이미 사용 중인 서브도메인입니다.' : '저장에 실패했습니다.');
         return;
       }
-      setService(prev => prev ? { ...prev, serviceSubdomain: value === '' ? null : value } : prev);
+      const body = await res.json() as { data?: { service?: { serviceSubdomain?: string | null } } };
+      const nextSubdomain = body.data?.service?.serviceSubdomain ?? null;
+      setService(prev => prev ? { ...prev, serviceSubdomain: nextSubdomain } : prev);
       setSubdomainEditing(false);
       setSubdomainError(null);
     } catch (error) {
@@ -333,6 +341,40 @@ export default function ServiceDetail() {
                 ))}
               </div>
             </InfoRow>
+            {endpoints.length > 0 && (
+              <InfoRow label="엔드포인트">
+                <div className="flex flex-col gap-1 font-mono">
+                  {endpoints.map(endpoint => {
+                    const label = endpoint.subdomain === ''
+                      ? '@'
+                      : endpoint.subdomain ?? 'internal';
+                    return (
+                      <span key={endpoint.endpointIndex} className="truncate">
+                        {label} -&gt; {endpoint.componentName ?? 'app'}:{endpoint.containerPort}
+                      </span>
+                    );
+                  })}
+                </div>
+              </InfoRow>
+            )}
+            {components.length > 0 && (
+              <InfoRow label="컴포넌트">
+                <div className="flex flex-col gap-1">
+                  {components.map(component => (
+                    <span key={component.componentIndex} className="flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full ${
+                        component.status === 'running' ? 'bg-green-400'
+                        : component.status === 'building' || component.status === 'starting' || component.status === 'restarting' ? 'bg-yellow-400'
+                        : component.status === 'failed' ? 'bg-red-400'
+                        : 'bg-secondary-text-color/40'
+                      }`} />
+                      <span className="font-mono">{component.componentName}</span>
+                      <span className="text-secondary-text-color/60">{component.status}</span>
+                    </span>
+                  ))}
+                </div>
+              </InfoRow>
+            )}
             <InfoRow label="에이전트">
               {service.agentName ?? <span className="text-secondary-text-color/50">미연결</span>}
             </InfoRow>
@@ -364,7 +406,7 @@ export default function ServiceDetail() {
                         if (e.key === 'Enter') void handleSaveSubdomain();
                         if (e.key === 'Escape') { setSubdomainEditing(false); setSubdomainError(null); }
                       }}
-                      placeholder="subdomain"
+                      placeholder="api 또는 @"
                       autoFocus
                       className="w-40 rounded border border-border-color bg-transparent px-1.5 py-0.5 font-mono text-xs text-primary-text-color outline-none focus:border-service-color"
                     />
@@ -373,22 +415,27 @@ export default function ServiceDetail() {
                   </>
                 ) : (
                   <>
-                    {service.serviceSubdomain ? (
+                    {serviceUrl ? (
                       <a
-                        href={buildServiceUrl(service.serviceSubdomain)}
+                        href={serviceUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="font-mono text-service-color hover:underline truncate"
                       >
-                        {buildServiceUrl(service.serviceSubdomain)}
+                        {serviceUrl}
                       </a>
+                    ) : hasServiceSubdomain && currentWorkspace?.workspaceSubdomain ? (
+                      <span className="font-mono text-secondary-text-color/70">
+                        {buildServiceUrl(serviceSubdomain, currentWorkspace.workspaceSubdomain)}
+                        <span className="ml-1 text-secondary-text-color/50">(비활성)</span>
+                      </span>
                     ) : (
                       <span className="font-mono text-secondary-text-color/50">미설정</span>
                     )}
                     {!isRemoved && (
                       <Pencil
                         className="w-3 h-3 shrink-0 cursor-pointer text-secondary-text-color/60 hover:text-primary-text-color transition-colors"
-                        onClick={() => { setSubdomainInput(service.serviceSubdomain ?? ''); setSubdomainEditing(true); }}
+                        onClick={() => { setSubdomainInput(service.serviceSubdomain === '' ? '@' : service.serviceSubdomain ?? ''); setSubdomainEditing(true); }}
                       />
                     )}
                   </>
