@@ -6,6 +6,8 @@ import { useAuth } from "./Auth.context";
 export interface Workspace {
   workspaceIndex: number;
   workspaceName: string;
+  workspaceSubdomain: string | null;
+  workspaceSubdomainActive: boolean;
   status: string;
   lastOnline: string | null;
 }
@@ -15,8 +17,10 @@ interface WorkspaceContextType {
   currentWorkspace: Workspace | null;
   isLoading: boolean;
   selectWorkspace: (index: number) => void;
-  createWorkspace: (name: string) => Promise<void>;
-  deleteWorkspace: (index: number) => Promise<void>;
+  createWorkspace: (name: string, subdomain?: string | null) => Promise<void>;
+  updateSubdomain: (index: number, subdomain: string | null) => Promise<void>;
+  toggleSubdomain: (index: number, active: boolean) => Promise<void>;
+  deleteWorkspace: (index: number, confirmation: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -76,11 +80,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("currentWorkspaceIndex", String(index));
   }
 
-  async function createWorkspace(name: string) {
+  async function createWorkspace(name: string, subdomain?: string | null) {
     const res = await apiFetch("/v1/workspace", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceName: name }),
+      body: JSON.stringify({ workspaceName: name, workspaceSubdomain: subdomain ?? null }),
     }, forceLogout);
 
     if (!res.ok) {
@@ -92,9 +96,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     await fetchWorkspaces();
   }
 
-  async function deleteWorkspace(index: number) {
+  async function updateSubdomain(index: number, subdomain: string | null) {
+    const res = await apiFetch(`/v1/workspace/${index}/subdomain`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subdomain }),
+    }, forceLogout);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(body.message ?? "Failed to update subdomain.");
+    }
+
+    await fetchWorkspaces();
+  }
+
+  async function toggleSubdomain(index: number, active: boolean) {
+    const res = await apiFetch(`/v1/workspace/${index}/subdomain/active`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ active }),
+    }, forceLogout);
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { message?: string };
+      throw new Error(body.message ?? "Failed to toggle subdomain.");
+    }
+
+    await fetchWorkspaces();
+  }
+
+  async function deleteWorkspace(index: number, confirmation: string) {
     const res = await apiFetch(`/v1/workspace/${index}`, {
       method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation }),
     }, forceLogout);
 
     if (!res.ok) {
@@ -126,6 +162,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isLoading,
       selectWorkspace,
       createWorkspace,
+      updateSubdomain,
+      toggleSubdomain,
       deleteWorkspace,
       refresh: fetchWorkspaces,
     }}>
@@ -134,6 +172,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useWorkspace() {
   const ctx = useContext(WorkspaceContext);
   if (!ctx) throw new Error("useWorkspace must be used within WorkspaceProvider");

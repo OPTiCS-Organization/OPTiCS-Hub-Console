@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutPanelTop, Server, Settings, ChevronDown, Check, Plus, Trash2, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash } from "lucide-react";
+import { LayoutPanelTop, Server, Settings, ChevronDown, Check, Plus, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash } from "lucide-react";
 import { useWorkspace } from "../context/Workspace.context";
 import { useModal } from "../context/Modal.context";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
@@ -24,19 +24,16 @@ const workspaceMenu = [
 type View = 'main' | 'workspace'
 
 export default function Navigation() {
-  const { workspaces, currentWorkspace, isLoading, selectWorkspace, deleteWorkspace } = useWorkspace();
+  const { workspaces, currentWorkspace, isLoading, selectWorkspace } = useWorkspace();
   const { openModal } = useModal();
   const [view, setView] = useState<View>('main');
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
-  const [confirmDeleteIndex, setConfirmDeleteIndex] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
-        setConfirmDeleteIndex(null);
       }
     }
     if (dropdownOpen) document.addEventListener("mousedown", handleClickOutside);
@@ -45,23 +42,6 @@ export default function Navigation() {
 
   function handleNewWorkspace() {
     openModal("새 워크스페이스 생성", <CreateWorkspaceModal />);
-  }
-
-  async function handleDelete(e: React.MouseEvent, index: number) {
-    e.stopPropagation();
-
-    if (confirmDeleteIndex !== index) {
-      setConfirmDeleteIndex(index);
-      return;
-    }
-
-    setDeletingIndex(index);
-    setConfirmDeleteIndex(null);
-    try {
-      await deleteWorkspace(index);
-    } finally {
-      setDeletingIndex(null);
-    }
   }
 
   const navItemClass = (isActive: boolean) =>
@@ -78,7 +58,7 @@ export default function Navigation() {
         <>
           <div className="px-3 pt-3">
             <button
-              onClick={() => { setView('main'); setDropdownOpen(false); setConfirmDeleteIndex(null); }}
+              onClick={() => { setView('main'); setDropdownOpen(false); }}
               className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1.5 text-xs font-medium text-secondary-text-color hover:bg-white/7.5 hover:text-primary-text-color active:bg-white/10 transition-colors duration-100 cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5 shrink-0" />
@@ -89,7 +69,7 @@ export default function Navigation() {
           <div className="px-3 pt-2 relative" ref={dropdownRef}>
             <span className={`${sectionLabelClass} mb-1.5 block`}>Current workspace</span>
             <button
-              onClick={() => { setDropdownOpen(prev => !prev); setConfirmDeleteIndex(null); }}
+              onClick={() => { setDropdownOpen(prev => !prev); }}
               className="w-full rounded-sm bg-modal-box-color border border-border-color hover:border-border-strong-color hover:bg-white/5 transition-colors duration-100 cursor-pointer px-3 py-2"
             >
               <div className="flex items-start justify-between gap-2">
@@ -123,7 +103,7 @@ export default function Navigation() {
                   workspaces.map((ws) => (
                     <div
                       key={ws.workspaceIndex}
-                      onClick={() => { selectWorkspace(ws.workspaceIndex); setDropdownOpen(false); setConfirmDeleteIndex(null); }}
+                      onClick={() => { selectWorkspace(ws.workspaceIndex); setDropdownOpen(false); }}
                       className="group flex items-center justify-between px-3 py-2 hover:bg-white/7.5 cursor-pointer transition-colors duration-100"
                     >
                       <div className="flex-1 min-w-0">
@@ -135,21 +115,6 @@ export default function Navigation() {
                       <div className="flex items-center gap-1.5 ml-1.5 shrink-0">
                         {currentWorkspace?.workspaceIndex === ws.workspaceIndex && (
                           <Check className="w-3 h-3 text-service-color" />
-                        )}
-                        {deletingIndex === ws.workspaceIndex ? (
-                          <Loader2 className="w-3 h-3 text-secondary-text-color animate-spin" />
-                        ) : (
-                          <button
-                            onClick={e => handleDelete(e, ws.workspaceIndex)}
-                            title={confirmDeleteIndex === ws.workspaceIndex ? "Click again to confirm" : "Delete"}
-                            className={`p-0.5 rounded transition-colors duration-100 cursor-pointer
-                              ${confirmDeleteIndex === ws.workspaceIndex
-                                ? 'text-red-400 bg-red-500/20'
-                                : 'text-secondary-text-color/0 group-hover:text-secondary-text-color hover:text-red-400!'
-                              }`}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
                         )}
                       </div>
                     </div>
@@ -190,7 +155,7 @@ export default function Navigation() {
               <span className="font-semibold text-current">{mainMenu[0].name}</span>
             </NavLink>
             <div
-              onClick={() => { setView('workspace'); setDropdownOpen(false); setConfirmDeleteIndex(null); }}
+              onClick={() => { setView('workspace'); setDropdownOpen(false); }}
               className="flex flex-row items-center justify-between rounded-r-sm border-l-2 border-service-color/0 px-2.5 py-2 text-sm leading-tight cursor-pointer transition-colors duration-100 mt-1 text-secondary-text-color hover:bg-white/7.5 hover:text-primary-text-color active:bg-white/10"
             >
               <div className="flex items-center gap-2.5">
