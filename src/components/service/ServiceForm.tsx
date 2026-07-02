@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertCircle, Check, ChevronLeft, ChevronRight, GitBranch, Loader2, Plus, Server, X } from "lucide-react";
+import { AlertCircle, Check, ChevronLeft, ChevronRight, GitBranch, Globe, Loader2, Plus, Server, X } from "lucide-react";
 import { apiFetch } from "../../lib/apiFetch";
 import { useAuth } from "../../context/Auth.context";
 import { useModal } from "../../context/Modal.context";
@@ -18,6 +18,18 @@ type CreateStep = 'source' | 'runtime' | 'env' | 'review';
 type PortMappingEntry = {
   hostPort: string;
   containerPort: string;
+};
+type EndpointEntry = {
+  componentName: string;
+  subdomain: string;
+  hostPort: string;
+  containerPort: string;
+};
+type ServiceEndpointPayload = {
+  componentName: string;
+  subdomain: string | null;
+  hostPort: number;
+  containerPort: number;
 };
 type SourceRepositoryEntry = {
   url: string;
@@ -141,6 +153,11 @@ function isValidPort(value: string) {
   return Number.isInteger(port) && port >= 1 && port <= 65535;
 }
 
+function isValidSubdomain(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === '' || normalized === '@' || /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(normalized);
+}
+
 function isValidGithubRepoUrl(value: string) {
   try {
     const url = new URL(value.trim());
@@ -169,6 +186,18 @@ function initialPortMappings(service?: ServiceItem): PortMappingEntry[] {
   }];
 }
 
+function initialEndpoints(service?: ServiceItem): EndpointEntry[] {
+  const endpoints = service?.endpoints;
+  if (!endpoints || endpoints.length === 0) return [];
+
+  return endpoints.map(endpoint => ({
+    componentName: endpoint.componentName ?? '',
+    subdomain: endpoint.subdomain === '' ? '@' : endpoint.subdomain ?? '',
+    hostPort: String(endpoint.hostPort),
+    containerPort: String(endpoint.containerPort),
+  }));
+}
+
 function cleanSourceRepositories(entries: SourceRepositoryEntry[]) {
   return entries.map(repo => ({
     url: repo.url.trim(),
@@ -180,6 +209,22 @@ function cleanEnvEntries(entries: EnvEntry[]) {
   return entries
     .filter(entry => entry.key.trim() || entry.value.trim())
     .map(entry => ({ key: entry.key.trim(), value: entry.value }));
+}
+
+function cleanEndpointEntries(entries: EndpointEntry[]) {
+  return entries
+    .filter(entry =>
+      entry.componentName.trim() ||
+      entry.subdomain.trim() ||
+      entry.hostPort.trim() ||
+      entry.containerPort.trim()
+    )
+    .map(entry => ({
+      componentName: entry.componentName.trim(),
+      subdomain: entry.subdomain.trim().toLowerCase(),
+      hostPort: entry.hostPort.trim(),
+      containerPort: entry.containerPort.trim(),
+    }));
 }
 
 function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
@@ -209,6 +254,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     () => parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory),
   );
   const [portMappings, setPortMappings] = useState<PortMappingEntry[]>(() => initialPortMappings(service));
+  const [endpointEntries, setEndpointEntries] = useState<EndpointEntry[]>(() => initialEndpoints(service));
   const [envEntries, setEnvEntries] = useState<EnvEntry[]>(() => {
     const entries = Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value }));
     return entries.length > 0 ? entries : [{ key: '', value: '' }];
@@ -240,6 +286,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     [service],
   );
   const initialPorts = useMemo(() => initialPortMappings(service), [service]);
+  const initialEndpointEntries = useMemo(() => initialEndpoints(service), [service]);
   const initialEnvEntries = useMemo(
     () => Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
     [service],
@@ -249,16 +296,18 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     const repositories = JSON.stringify(cleanSourceRepositories(sourceRepositories)) !== JSON.stringify(cleanSourceRepositories(initialSourceRepositories));
     const agent = form.agentIndex !== initialForm.agentIndex;
     const ports = JSON.stringify(portMappings) !== JSON.stringify(initialPorts);
+    const endpoints = JSON.stringify(cleanEndpointEntries(endpointEntries)) !== JSON.stringify(cleanEndpointEntries(initialEndpointEntries));
     const release = form.serviceVersion !== initialForm.serviceVersion;
     const env = JSON.stringify(cleanEnvEntries(envEntries)) !== JSON.stringify(cleanEnvEntries(initialEnvEntries));
-    return { basic, repositories, agent, ports, release, env };
-  }, [envEntries, form, initialEnvEntries, initialForm, initialPorts, initialSourceRepositories, portMappings, sourceRepositories]);
+    return { basic, repositories, agent, ports, endpoints, release, env };
+  }, [endpointEntries, envEntries, form, initialEndpointEntries, initialEnvEntries, initialForm, initialPorts, initialSourceRepositories, portMappings, sourceRepositories]);
   const modifiedLabels = useMemo(() => {
     const labels: string[] = [];
     if (modifiedGroups.basic) labels.push('기본 정보');
     if (modifiedGroups.repositories) labels.push('레포지토리');
     if (modifiedGroups.agent) labels.push('배포 대상');
     if (modifiedGroups.ports) labels.push('포트');
+    if (modifiedGroups.endpoints) labels.push('엔드포인트');
     if (modifiedGroups.release) labels.push('릴리즈');
     if (modifiedGroups.env) labels.push('환경 변수');
     return labels;
@@ -274,6 +323,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     },
     sourceRepositories: cleanSourceRepositories(parseSourceRepositories(service?.serviceSourceUrl, service?.serviceRootDirectory)),
     portMappings: initialPortMappings(service),
+    endpointEntries: cleanEndpointEntries(initialEndpoints(service)),
     envEntries: Object.entries(service?.serviceEnv ?? {}).map(([key, value]) => ({ key, value })),
   }), [service]);
   const currentDirtySnapshot = useMemo(() => JSON.stringify({
@@ -286,8 +336,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     },
     sourceRepositories: cleanSourceRepositories(sourceRepositories),
     portMappings,
+    endpointEntries: cleanEndpointEntries(endpointEntries),
     envEntries: envEntries.filter(entry => entry.key.trim() || entry.value.trim()),
-  }), [envEntries, form, portMappings, sourceRepositories]);
+  }), [endpointEntries, envEntries, form, portMappings, sourceRepositories]);
   const hasCreateInput = useMemo(() => (
     form.serviceName.trim() !== '' ||
     form.serviceRootDirectory.trim() !== '' ||
@@ -295,8 +346,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     form.serviceDeployPreset !== 'dockerfile' ||
     sourceRepositories.some(repo => repo.url.trim() !== '' || repo.rootDirectory.trim() !== '') ||
     portMappings.some(mapping => mapping.hostPort.trim() !== '' || mapping.containerPort.trim() !== '') ||
+    endpointEntries.some(endpoint => endpoint.componentName.trim() !== '' || endpoint.subdomain.trim() !== '' || endpoint.hostPort.trim() !== '' || endpoint.containerPort.trim() !== '') ||
     envEntries.some(entry => entry.key.trim() !== '' || entry.value.trim() !== '')
-  ), [envEntries, form, portMappings, sourceRepositories]);
+  ), [endpointEntries, envEntries, form, portMappings, sourceRepositories]);
   const shouldConfirmClose = isCreateMode
     ? hasCreateInput
     : currentDirtySnapshot !== initialDirtySnapshot;
@@ -344,6 +396,29 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       return next.length > 0 ? next : [{ hostPort: '', containerPort: '' }];
     });
   }
+  function defaultEndpointComponentName() {
+    if (form.serviceDeployPreset === 'compose') return form.serviceName.trim();
+    return 'app';
+  }
+  function addEndpoint() {
+    const firstPortMapping = portMappings[0] ?? { hostPort: '', containerPort: '' };
+    setEndpointEntries(prev => [
+      ...prev,
+      {
+        componentName: defaultEndpointComponentName(),
+        subdomain: prev.length === 0 ? '@' : '',
+        hostPort: firstPortMapping.hostPort,
+        containerPort: firstPortMapping.containerPort,
+      },
+    ]);
+  }
+  function updateEndpoint(index: number, field: keyof EndpointEntry, value: string) {
+    setError(null);
+    setEndpointEntries(prev => prev.map((endpoint, i) => i === index ? { ...endpoint, [field]: value } : endpoint));
+  }
+  function removeEndpoint(index: number) {
+    setEndpointEntries(prev => prev.filter((_, i) => i !== index));
+  }
   function addEnvEntry() { setEnvEntries(prev => [...prev, { key: '', value: '' }]); }
   function updateEnvEntry(index: number, field: 'key' | 'value', value: string) {
     setError(null);
@@ -386,6 +461,18 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       const containerPorts = portMappings.map(mapping => mapping.containerPort.trim());
       if (new Set(hostPorts).size !== hostPorts.length) return '외부 포트가 중복되었습니다.';
       if (new Set(containerPorts).size !== containerPorts.length) return '내부 포트가 중복되었습니다.';
+      const endpoints = cleanEndpointEntries(endpointEntries);
+      for (const endpoint of endpoints) {
+        if (!isValidPort(endpoint.hostPort)) return '엔드포인트 외부 포트는 1-65535 사이 숫자로 입력해주세요.';
+        if (!isValidPort(endpoint.containerPort)) return '엔드포인트 내부 포트는 1-65535 사이 숫자로 입력해주세요.';
+        if (!isValidSubdomain(endpoint.subdomain)) return '엔드포인트 서브도메인은 소문자/숫자/하이픈 또는 @만 사용할 수 있습니다.';
+      }
+      const publicSubdomains = endpoints
+        .map(endpoint => endpoint.subdomain === '@' ? '' : endpoint.subdomain)
+        .filter(subdomain => subdomain !== '');
+      if (new Set(publicSubdomains).size !== publicSubdomains.length) return '엔드포인트 서브도메인이 중복되었습니다.';
+      const rootEndpointCount = endpoints.filter(endpoint => endpoint.subdomain === '@').length;
+      if (rootEndpointCount > 1) return '루트 엔드포인트(@)는 하나만 등록할 수 있습니다.';
       if (!form.serviceVersion.trim()) return '버전을 입력해주세요.';
       if (agents.length === 0) return '연결된 에이전트가 없습니다.';
       if (!form.agentIndex) return '배포할 에이전트를 선택해주세요.';
@@ -474,6 +561,12 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
       hostPort: parseInt(mapping.hostPort, 10),
       containerPort: parseInt(mapping.containerPort, 10),
     }));
+    const parsedEndpoints: ServiceEndpointPayload[] = cleanEndpointEntries(endpointEntries).map(endpoint => ({
+      componentName: endpoint.componentName || defaultEndpointComponentName(),
+      subdomain: endpoint.subdomain === '' ? null : endpoint.subdomain,
+      hostPort: parseInt(endpoint.hostPort, 10),
+      containerPort: parseInt(endpoint.containerPort, 10),
+    }));
     const primaryPortMapping = parsedPortMappings[0];
     const serviceRootDirectory = primaryRootDirectory;
 
@@ -489,6 +582,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         serviceHostPort: primaryPortMapping.hostPort,
         serviceContainerPort: primaryPortMapping.containerPort,
         servicePortMappings: parsedPortMappings,
+        serviceEndpoints: parsedEndpoints,
         serviceSourceUrl: sourceUrl,
         ...(serviceRootDirectory && { serviceRootDirectory }),
         serviceVersion: form.serviceVersion.trim(),
@@ -502,6 +596,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         serviceHostPort: primaryPortMapping.hostPort,
         serviceContainerPort: primaryPortMapping.containerPort,
         servicePortMappings: parsedPortMappings,
+        serviceEndpoints: parsedEndpoints,
         serviceSourceUrl: sourceUrl,
         serviceRootDirectory,
         serviceVersion: form.serviceVersion.trim(),
@@ -688,6 +783,75 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           </div>
         </FormSection>
 
+        <FormSection
+          title="엔드포인트"
+          description="공개 서브도메인과 연결할 컴포넌트/포트를 등록합니다. @는 워크스페이스 루트 도메인을 의미합니다."
+          modified={!isCreateMode && modifiedGroups.endpoints}
+          compact={!isCreateMode}
+          action={(
+            <button type="button" onClick={addEndpoint} className="inline-flex h-7 shrink-0 items-center gap-1 rounded-sm border border-border-color px-2 text-xs text-secondary-text-color transition-colors hover:border-border-strong-color hover:text-primary-text-color cursor-pointer">
+              <Plus className="w-3 h-3" />
+              추가
+            </button>
+          )}
+        >
+          {endpointEntries.length === 0 ? (
+            <div className="flex items-center gap-2 rounded-sm border border-border-color bg-background-color px-3 py-2 text-xs text-secondary-text-color">
+              <Globe className="h-3.5 w-3.5 shrink-0 text-tertiary-text-color" />
+              <span>엔드포인트를 추가하지 않으면 첫 번째 포트 매핑으로 기본 엔드포인트가 생성됩니다.</span>
+            </div>
+          ) : (
+            <>
+              <div className="mb-1.5 grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] gap-2 px-0.5">
+                <span className={compactLabelCls}>컴포넌트</span>
+                <span className={compactLabelCls}>서브도메인</span>
+                <span className={compactLabelCls}>외부 포트</span>
+                <span className={compactLabelCls}>내부 포트</span>
+                <span />
+              </div>
+              <div className="flex max-h-44 flex-col gap-1.5 overflow-y-auto pr-1">
+                {endpointEntries.map((endpoint, index) => (
+                  <div key={index} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] items-center gap-2">
+                    <input
+                      className={compactInputCls}
+                      placeholder={defaultEndpointComponentName() || 'app'}
+                      value={endpoint.componentName}
+                      onChange={e => updateEndpoint(index, 'componentName', e.target.value)}
+                    />
+                    <input
+                      className={compactInputCls}
+                      placeholder="api 또는 @"
+                      value={endpoint.subdomain}
+                      onChange={e => updateEndpoint(index, 'subdomain', e.target.value)}
+                    />
+                    <input
+                      className={compactInputCls}
+                      placeholder="외부"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={endpoint.hostPort}
+                      onChange={e => updateEndpoint(index, 'hostPort', e.target.value)}
+                    />
+                    <input
+                      className={compactInputCls}
+                      placeholder="내부"
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={endpoint.containerPort}
+                      onChange={e => updateEndpoint(index, 'containerPort', e.target.value)}
+                    />
+                    <button type="button" onClick={() => removeEndpoint(index)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </FormSection>
+
         <FormSection title="릴리즈 정보" description="이번 배포에서 표시될 버전을 입력합니다." modified={!isCreateMode && modifiedGroups.release} compact={!isCreateMode}>
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
@@ -778,6 +942,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
     const repositories = sourceRepositories
       .map(repo => ({ url: repo.url.trim(), rootDirectory: normalizeRootDirectory(repo.rootDirectory) }))
       .filter(repo => repo.url);
+    const endpoints = cleanEndpointEntries(endpointEntries);
     return (
       <FormSection title="배포 요약" description="아래 내용으로 서비스 배포를 시작합니다.">
         <div className="rounded-sm border border-border-color bg-background-color px-3 py-1">
@@ -798,6 +963,19 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                 <span key={`${mapping.hostPort}:${mapping.containerPort}`}>:{mapping.hostPort} -&gt; :{mapping.containerPort}</span>
               ))}
             </div>
+          } />
+          <SummaryRow label="엔드포인트" value={
+            endpoints.length === 0 ? (
+              <span className="text-secondary-text-color">기본값</span>
+            ) : (
+              <div className="flex flex-col gap-1 font-mono">
+                {endpoints.map(endpoint => (
+                  <span key={`${endpoint.subdomain}:${endpoint.hostPort}:${endpoint.containerPort}`} className="truncate">
+                    {endpoint.subdomain || 'internal'} -&gt; {endpoint.componentName || defaultEndpointComponentName()}:{endpoint.containerPort}
+                  </span>
+                ))}
+              </div>
+            )
           } />
           <SummaryRow label="버전" value={`v${form.serviceVersion.trim()}`} />
           <SummaryRow label="에이전트" value={selectedAgent?.agentName ?? <span className="text-secondary-text-color">미선택</span>} />
