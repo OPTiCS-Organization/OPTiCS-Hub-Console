@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, GitBranch, Globe, Package, Pencil, Play, Square, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, GitBranch, Globe, Loader2, Package, Pencil, Play, Plus, Square, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
 import { useWorkspace } from "../context/Workspace.context";
 import { useServiceLog } from "../hooks/useServiceLog";
 import { statusDot, statusLabel, presetLabel } from "../constants/service";
-import type { ServiceItem } from "../interfaces/ServiceItem.interface";
+import type { ServiceEndpoint, ServiceItem } from "../interfaces/ServiceItem.interface";
 import ServiceForm from "../components/service/ServiceForm";
 import LogPanel from "../components/service/LogPanel";
 
@@ -46,6 +46,276 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
     <div className="flex items-start gap-4 py-2.5 border-b border-border-color/40 last:border-0">
       <span className="w-24 shrink-0 text-xs text-secondary-text-color/70">{label}</span>
       <div className="min-w-0 flex-1 text-xs text-primary-text-color">{children}</div>
+    </div>
+  );
+}
+
+type EndpointFormEntry = {
+  componentName: string;
+  subdomain: string;
+  hostPort: string;
+  containerPort: string;
+};
+
+type EndpointPayload = {
+  componentName: string;
+  subdomain: string | null;
+  hostPort: number;
+  containerPort: number;
+};
+
+const endpointInputCls = "h-9 w-full rounded-sm border border-border-color bg-background-color px-2.5 text-xs text-primary-text-color placeholder:text-secondary-text-color/40 outline-none transition-colors focus:border-service-color";
+
+function defaultEndpointComponentName(service: ServiceItem) {
+  return service.serviceDeployPreset === 'compose' ? service.serviceName : 'app';
+}
+
+function endpointEntriesFromService(service: ServiceItem): EndpointFormEntry[] {
+  if (service.endpoints && service.endpoints.length > 0) {
+    return service.endpoints.map(endpoint => ({
+      componentName: endpoint.componentName ?? defaultEndpointComponentName(service),
+      subdomain: endpoint.subdomain === '' ? '@' : endpoint.subdomain ?? '',
+      hostPort: String(endpoint.hostPort),
+      containerPort: String(endpoint.containerPort),
+    }));
+  }
+
+  const hostPort = service.serviceHostPort ?? service.servicePort;
+  const containerPort = service.serviceContainerPort ?? service.servicePort;
+  return [{
+    componentName: defaultEndpointComponentName(service),
+    subdomain: service.serviceSubdomain === '' ? '@' : service.serviceSubdomain ?? '',
+    hostPort: String(hostPort),
+    containerPort: String(containerPort),
+  }];
+}
+
+function cleanEndpointEntries(entries: EndpointFormEntry[]) {
+  return entries
+    .filter(entry =>
+      entry.componentName.trim() ||
+      entry.subdomain.trim() ||
+      entry.hostPort.trim() ||
+      entry.containerPort.trim()
+    )
+    .map(entry => ({
+      componentName: entry.componentName.trim(),
+      subdomain: entry.subdomain.trim().toLowerCase(),
+      hostPort: entry.hostPort.trim(),
+      containerPort: entry.containerPort.trim(),
+    }));
+}
+
+function isValidEndpointPort(value: string) {
+  const port = Number(value);
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
+}
+
+function isValidEndpointSubdomain(value: string) {
+  const normalized = value.trim().toLowerCase();
+  return normalized === '' || normalized === '@' || /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(normalized);
+}
+
+function EndpointEditor({
+  service,
+  onSaved,
+  onClose,
+  logout,
+}: {
+  service: ServiceItem;
+  onSaved: (servicePatch: Partial<ServiceItem>) => void;
+  onClose: () => void;
+  logout: () => void;
+}) {
+  const [entries, setEntries] = useState<EndpointFormEntry[]>(() => endpointEntriesFromService(service));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function addEndpoint() {
+    const first = entries[0] ?? endpointEntriesFromService(service)[0];
+    setEntries(prev => [
+      ...prev,
+      {
+        componentName: defaultEndpointComponentName(service),
+        subdomain: '',
+        hostPort: first?.hostPort ?? String(service.serviceHostPort ?? service.servicePort),
+        containerPort: first?.containerPort ?? String(service.serviceContainerPort ?? service.servicePort),
+      },
+    ]);
+  }
+
+  function updateEndpoint(index: number, field: keyof EndpointFormEntry, value: string) {
+    setError(null);
+    setEntries(prev => prev.map((entry, i) => i === index ? { ...entry, [field]: value } : entry));
+  }
+
+  function removeEndpoint(index: number) {
+    setError(null);
+    setEntries(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function validate() {
+    const cleaned = cleanEndpointEntries(entries);
+    for (const endpoint of cleaned) {
+      if (!isValidEndpointPort(endpoint.hostPort)) return '외부 포트는 1-65535 사이 숫자로 입력해주세요.';
+      if (!isValidEndpointPort(endpoint.containerPort)) return '내부 포트는 1-65535 사이 숫자로 입력해주세요.';
+      if (!isValidEndpointSubdomain(endpoint.subdomain)) return '서브도메인은 소문자/숫자/하이픈 또는 @만 사용할 수 있습니다.';
+    }
+
+    const publicSubdomains = cleaned
+      .map(endpoint => endpoint.subdomain === '@' ? '' : endpoint.subdomain)
+      .filter(subdomain => subdomain !== '');
+    if (new Set(publicSubdomains).size !== publicSubdomains.length) return '서브도메인이 중복되었습니다.';
+    if (cleaned.filter(endpoint => endpoint.subdomain === '@').length > 1) return '루트 엔드포인트(@)는 하나만 등록할 수 있습니다.';
+    return null;
+  }
+
+  async function saveEndpoints() {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const serviceEndpoints: EndpointPayload[] = cleanEndpointEntries(entries).map(endpoint => ({
+      componentName: endpoint.componentName || defaultEndpointComponentName(service),
+      subdomain: endpoint.subdomain === '' ? null : endpoint.subdomain,
+      hostPort: parseInt(endpoint.hostPort, 10),
+      containerPort: parseInt(endpoint.containerPort, 10),
+    }));
+
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await apiFetch(`/v1/service/${service.serviceIndex}/endpoints`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceEndpoints }),
+      }, logout);
+      if (!res.ok) {
+        const data = await res.json() as { message?: string };
+        setError(data.message ?? '저장에 실패했습니다.');
+        return;
+      }
+      const body = await res.json() as {
+        data?: {
+          service?: {
+            serviceSubdomain?: string | null;
+            endpoints?: Omit<ServiceEndpoint, 'endpointIndex'>[];
+          };
+        };
+      };
+      const savedEndpoints = body.data?.service?.endpoints?.map((endpoint, index) => ({
+        endpointIndex: index,
+        componentName: endpoint.componentName,
+        subdomain: endpoint.subdomain,
+        hostPort: endpoint.hostPort,
+        containerPort: endpoint.containerPort,
+      }));
+      onSaved({
+        serviceSubdomain: body.data?.service?.serviceSubdomain ?? null,
+        ...(savedEndpoints && { endpoints: savedEndpoints }),
+      });
+      onClose();
+    } catch (error) {
+      console.log(error);
+      setError('저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs leading-relaxed text-secondary-text-color">
+          공개할 서브도메인과 연결할 포트를 지정합니다. @는 워크스페이스 루트 도메인입니다.
+        </p>
+        <button
+          type="button"
+          onClick={addEndpoint}
+          className="inline-flex h-8 shrink-0 items-center gap-1 rounded-sm border border-border-color px-2.5 text-xs text-secondary-text-color transition-colors hover:border-border-strong-color hover:text-primary-text-color cursor-pointer"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          추가
+        </button>
+      </div>
+
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] gap-2 px-0.5 text-[10px] font-medium uppercase tracking-wider text-secondary-text-color">
+        <span>컴포넌트</span>
+        <span>서브도메인</span>
+        <span>외부 포트</span>
+        <span>내부 포트</span>
+        <span />
+      </div>
+
+      <div className="flex max-h-72 flex-col gap-1.5 overflow-y-auto pr-1">
+        {entries.map((entry, index) => (
+          <div key={index} className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] items-center gap-2">
+            <input
+              className={endpointInputCls}
+              placeholder={defaultEndpointComponentName(service)}
+              value={entry.componentName}
+              onChange={e => updateEndpoint(index, 'componentName', e.target.value)}
+            />
+            <input
+              className={endpointInputCls}
+              placeholder="api 또는 @"
+              value={entry.subdomain}
+              onChange={e => updateEndpoint(index, 'subdomain', e.target.value)}
+            />
+            <input
+              className={endpointInputCls}
+              type="number"
+              min={1}
+              max={65535}
+              placeholder="외부"
+              value={entry.hostPort}
+              onChange={e => updateEndpoint(index, 'hostPort', e.target.value)}
+            />
+            <input
+              className={endpointInputCls}
+              type="number"
+              min={1}
+              max={65535}
+              placeholder="내부"
+              value={entry.containerPort}
+              onChange={e => updateEndpoint(index, 'containerPort', e.target.value)}
+            />
+            <button type="button" onClick={() => removeEndpoint(index)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {entries.length === 0 && (
+        <div className="rounded-sm border border-border-color bg-background-color px-3 py-2 text-xs text-secondary-text-color">
+          저장하면 첫 번째 포트 매핑 기준의 기본 엔드포인트가 생성됩니다.
+        </div>
+      )}
+
+      {error && <p className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>}
+
+      <div className="flex justify-end gap-2 border-t border-border-color pt-3">
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={saving}
+          className="h-8 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color cursor-pointer disabled:opacity-50"
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          onClick={() => { void saveEndpoints(); }}
+          disabled={saving}
+          className="inline-flex h-8 items-center gap-2 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          저장
+        </button>
+      </div>
     </div>
   );
 }
@@ -247,6 +517,21 @@ export default function ServiceDetail() {
     ));
   }
 
+  function handleEditEndpoints() {
+    if (!service) return;
+    openModal('엔드포인트 편집', (
+      <EndpointEditor
+        service={service}
+        logout={logout}
+        onClose={() => closeModal({ force: true })}
+        onSaved={(servicePatch) => {
+          setService(prev => prev ? { ...prev, ...servicePatch } : prev);
+          void fetchService();
+        }}
+      />
+    ));
+  }
+
   const sourceRepositories = (() => {
     if (!service.serviceSourceUrl) return [];
     return parseSourceRepositories(service.serviceSourceUrl);
@@ -341,22 +626,39 @@ export default function ServiceDetail() {
                 ))}
               </div>
             </InfoRow>
-            {endpoints.length > 0 && (
-              <InfoRow label="엔드포인트">
-                <div className="flex flex-col gap-1 font-mono">
-                  {endpoints.map(endpoint => {
-                    const label = endpoint.subdomain === ''
-                      ? '@'
-                      : endpoint.subdomain ?? 'internal';
-                    return (
-                      <span key={endpoint.endpointIndex} className="truncate">
-                        {label} -&gt; {endpoint.componentName ?? 'app'}:{endpoint.containerPort}
-                      </span>
-                    );
-                  })}
+            <InfoRow label="엔드포인트">
+              <div className="flex min-w-0 items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  {endpoints.length === 0 ? (
+                    <span className="font-mono text-secondary-text-color/50">미설정</span>
+                  ) : (
+                    <div className="flex flex-col gap-1 font-mono">
+                      {endpoints.map(endpoint => {
+                        const label = endpoint.subdomain === ''
+                          ? '@'
+                          : endpoint.subdomain ?? 'internal';
+                        return (
+                          <span key={endpoint.endpointIndex} className="truncate">
+                            {label} -&gt; {endpoint.componentName ?? 'app'}:{endpoint.containerPort}
+                            <span className="text-secondary-text-color/50"> / host :{endpoint.hostPort}</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              </InfoRow>
-            )}
+                {!isRemoved && (
+                  <button
+                    type="button"
+                    onClick={handleEditEndpoints}
+                    className="mt-0.5 shrink-0 text-secondary-text-color/60 transition-colors hover:text-primary-text-color cursor-pointer"
+                    aria-label="엔드포인트 편집"
+                  >
+                    {endpoints.length === 0 ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                  </button>
+                )}
+              </div>
+            </InfoRow>
             {components.length > 0 && (
               <InfoRow label="컴포넌트">
                 <div className="flex flex-col gap-1">
