@@ -5,8 +5,10 @@ import { useWorkspace } from "../context/Workspace.context";
 import { useAuth } from "../context/Auth.context";
 import { apiFetch } from "../lib/apiFetch";
 import AgentCard, { type Agent } from "../components/agent/AgentCard";
+import { useNavigate } from "react-router-dom";
 
 export default function Agents() {
+  const navigate = useNavigate();
   const { currentWorkspace, refresh } = useWorkspace();
   const { logout } = useAuth();
   const [agentCode, setAgentCode] = useState('');
@@ -176,6 +178,7 @@ export default function Agents() {
               <AgentCard
                 key={agent.agentIndex}
                 agent={agent}
+                onOpen={selected => navigate(`/agents/${selected.agentUuid}`)}
                 onDisconnect={handleDisconnectAgent}
                 onCancel={handleCancelAgent}
               />

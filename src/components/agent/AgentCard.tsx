@@ -11,9 +11,15 @@ export interface Agent {
   agentCreatedAt: string;
   agentLastOnline: string;
   workspaceName: string | null;
+  agentVersion: string | null;
 }
 
-const statusDot: Record<Agent['agentStatus'], string> = {
+/** 버전을 보고하지 않는 Agent는 버전 필드가 도입되기 전(0.5.0 미만) 빌드다. */
+export function formatAgentVersion(version: string | null) {
+  return version ? `v${version}` : '< 0.5.0';
+}
+
+export const statusDot: Record<Agent['agentStatus'], string> = {
   online: 'bg-green-400',
   offline: 'bg-secondary-text-color/40',
   waiting: 'bg-yellow-400',
@@ -21,19 +27,27 @@ const statusDot: Record<Agent['agentStatus'], string> = {
   failed: 'bg-red-400',
 };
 
-const connectionBadge: Record<Agent['agentConnection'], string> = {
+export const statusLabel: Record<Agent['agentStatus'], string> = {
+  online: '온라인',
+  offline: '오프라인',
+  waiting: '대기 중',
+  restarting: '재시작 중',
+  failed: '실패',
+};
+
+export const connectionBadge: Record<Agent['agentConnection'], string> = {
   linked: 'bg-service-color/15 text-service-color',
   requested: 'bg-yellow-500/15 text-yellow-400',
   unlinked: 'bg-white/5 text-secondary-text-color',
 };
 
-const connectionLabel: Record<Agent['agentConnection'], string> = {
+export const connectionLabel: Record<Agent['agentConnection'], string> = {
   linked: 'Linked',
   requested: 'Requested',
   unlinked: 'Unlinked',
 };
 
-function formatRelative(dateStr: string) {
+export function formatRelative(dateStr: string) {
   const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
   if (diff < 60) return `${diff}초 전`;
   if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
@@ -43,13 +57,22 @@ function formatRelative(dateStr: string) {
 
 interface AgentCardProps {
   agent: Agent;
+  onOpen?: (agent: Agent) => void;
   onDisconnect?: (agent: Agent) => void;
   onCancel?: (agent: Agent) => void;
 }
 
-export default function AgentCard({ agent, onDisconnect, onCancel }: AgentCardProps) {
+export default function AgentCard({ agent, onOpen, onDisconnect, onCancel }: AgentCardProps) {
   return (
-    <div className="border border-border-color rounded-md bg-modal-box-color overflow-hidden">
+    <div
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      onClick={() => onOpen?.(agent)}
+      onKeyDown={event => {
+        if (event.key === 'Enter' || event.key === ' ') onOpen?.(agent);
+      }}
+      className={`border border-border-color rounded-md bg-modal-box-color overflow-hidden transition-colors ${onOpen ? 'cursor-pointer hover:border-border-strong-color' : ''}`}
+    >
       <div className="px-4 py-4 flex items-start gap-3">
         <div className="relative w-9 h-9 rounded-md bg-white/5 flex items-center justify-center shrink-0">
           <ServerCog className="w-4.5 h-4.5 text-secondary-text-color" />
@@ -73,13 +96,15 @@ export default function AgentCard({ agent, onDisconnect, onCancel }: AgentCardPr
         </div>
       </div>
       <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
-        <span className="text-secondary-text-color/60 text-[10px]">
+        <span className="text-secondary-text-color/60 text-[10px] font-mono">
+          {formatAgentVersion(agent.agentVersion)}
+          <span className="mx-1.5 opacity-50">·</span>
           {agent.agentStatus === 'online' ? '현재 온라인' : `마지막 온라인 ${formatRelative(agent.agentLastOnline)}`}
         </span>
         {agent.agentConnection === 'linked' ? (
           <button
             type="button"
-            onClick={() => onDisconnect?.(agent)}
+            onClick={event => { event.stopPropagation(); onDisconnect?.(agent); }}
             className="text-[10px] px-2 py-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
           >
             연결 해제
@@ -87,7 +112,7 @@ export default function AgentCard({ agent, onDisconnect, onCancel }: AgentCardPr
         ) : agent.agentConnection === 'requested' ? (
           <button
             type="button"
-            onClick={() => onCancel?.(agent)}
+            onClick={event => { event.stopPropagation(); onCancel?.(agent); }}
             className="text-[10px] px-2 py-1 rounded-sm bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors cursor-pointer"
           >
             요청 취소

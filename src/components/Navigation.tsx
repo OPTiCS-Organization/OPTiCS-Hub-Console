@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutPanelTop, Server, Settings, ChevronDown, Check, Plus, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash } from "lucide-react";
+import { LayoutPanelTop, Server, Settings, ChevronDown, Check, Plus, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash, FileText } from "lucide-react";
 import { useWorkspace } from "../context/Workspace.context";
 import { useModal } from "../context/Modal.context";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
@@ -12,6 +12,7 @@ const sectionLabelClass = "px-2 text-[9px] font-medium uppercase tracking-widest
 const mainMenu = [
   { name: 'Dashboard', path: '/dashboard', icon: <LayoutDashboard className={IconSize} /> },
   { name: 'Settings', path: '/settings', icon: <Settings className={IconSize} /> },
+  { name: 'Patch Notes', path: '/patch-notes', icon: <FileText className={IconSize} /> },
 ]
 
 const workspaceMenu = [
@@ -171,6 +172,13 @@ export default function Navigation() {
               <span className="shrink-0 text-current">{mainMenu[1].icon}</span>
               <span className="font-semibold text-current">{mainMenu[1].name}</span>
             </NavLink>
+            <NavLink
+              to={mainMenu[2].path}
+              className={({ isActive }) => navItemClass(isActive)}
+            >
+              <span className="shrink-0 text-current">{mainMenu[2].icon}</span>
+              <span className="font-semibold text-current">{mainMenu[2].name}</span>
+            </NavLink>
           </>
         )}
 
@@ -195,7 +203,17 @@ export default function Navigation() {
       {/* Footer */}
       <div className="px-3 py-3 border-t border-border-color">
         <span className="text-secondary-text-color font-semibold text-xs block leading-tight">OPTiCS Hub Console</span>
-        <span className="text-[10px] text-tertiary-text-color">v{packageJson.version} <span className="font-light">Dev</span></span>
+        {/* 버전 표시가 곧 패치노트 진입점이다. 메뉴를 늘리지 않고 자연스러운 자리에 붙인다. */}
+        <NavLink
+          to="/patch-notes"
+          className={({ isActive }) =>
+            `text-[10px] hover:underline cursor-pointer transition-colors duration-100 ${
+              isActive ? 'text-service-color' : 'text-tertiary-text-color hover:text-secondary-text-color'
+            }`
+          }
+        >
+          v{packageJson.version} <span className="font-light">Dev</span>
+        </NavLink>
       </div>
 
     </div>

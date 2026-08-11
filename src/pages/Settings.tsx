@@ -3,6 +3,7 @@ import { Section } from "../components/ui/Section";
 import { SettingOption, SettingType } from "../components/ui/SettingOption";
 import TwoFactorDisconnectModal from "../components/TwoFactorDisconnectModal";
 import TwoFactorSetupModal from "../components/TwoFactorSetupModal";
+import PasswordChangeModal from "../components/PasswordChangeModal";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
 import { apiFetch } from "../lib/apiFetch";
@@ -16,12 +17,14 @@ type TwoFactorStatusResponse = {
 };
 
 export default function Settings() {
-  const { logout } = useAuth();
+  const { logout, needsVerification } = useAuth();
   const { openModal } = useModal();
   const [isTotpActive, setIsTotpActive] = useState<boolean | null>(null);
   const [totpActivatedAt, setTotpActivatedAt] = useState<string | null>(null);
   const [isLoadingTotp, setIsLoadingTotp] = useState(true);
   const [totpStatusError, setTotpStatusError] = useState("");
+  // 서버가 마지막 변경 시각을 내려주지 않으므로, 이번 세션에서 바꾼 경우에만 표시한다.
+  const [passwordChangedAt, setPasswordChangedAt] = useState<Date | null>(null);
 
   const loadTwoFactorStatus = useCallback(async () => {
     setIsLoadingTotp(true);
@@ -45,6 +48,13 @@ export default function Settings() {
   useEffect(() => {
     void loadTwoFactorStatus();
   }, [loadTwoFactorStatus]);
+
+  function handlePasswordChange() {
+    openModal(
+      "비밀번호 변경",
+      <PasswordChangeModal onChanged={() => setPasswordChangedAt(new Date())} />,
+    );
+  }
 
   function handleTwoFactorAction() {
     if (totpStatusError) {
@@ -76,11 +86,17 @@ export default function Settings() {
     );
   }
 
+  // 이미 등록된 계정은 인증 여부와 무관하게 해제할 수 있어야 하므로,
+  // 미인증 안내는 "아직 등록하지 않은" 경우에만 노출한다.
+  const blockedByVerification = needsVerification && !isTotpActive;
+
   const twoFactorDescription = totpStatusError
     ? totpStatusError
     : isTotpActive
       ? `활성화됨${totpActivatedAt ? ` · ${new Date(totpActivatedAt).toLocaleDateString("ko-KR")}` : ""}`
-      : "인증 앱을 등록해 계정 보안을 강화합니다.";
+      : blockedByVerification
+        ? "2단계 인증을 등록하려면 먼저 이메일 인증을 완료해야 합니다."
+        : "인증 앱을 등록해 계정 보안을 강화합니다.";
 
   return (
     <div className="text-primary-text-color mt-20">
@@ -94,15 +110,19 @@ export default function Settings() {
         />
         <SettingOption
           settingName="비밀번호 변경"
-          description="기존 비밀번호를 새 비밀번호로 변경합니다."
-          type={SettingType.Button} 
+          description={passwordChangedAt
+            ? `변경됨 · ${passwordChangedAt.toLocaleDateString("ko-KR")}`
+            : "기존 비밀번호를 새 비밀번호로 변경합니다."}
+          type={SettingType.Button}
+          buttonLabel="변경"
+          onClick={handlePasswordChange}
         />
         <SettingOption
           settingName="2단계 인증"
           description={twoFactorDescription}
           type={isTotpActive ? SettingType.Button_Danger : SettingType.Button}
           buttonLabel={isLoadingTotp ? "확인 중..." : totpStatusError ? "다시 시도" : isTotpActive ? "해제" : "등록"}
-          buttonDisabled={isLoadingTotp}
+          buttonDisabled={isLoadingTotp || blockedByVerification}
           onClick={handleTwoFactorAction}
         />
       </Section>
