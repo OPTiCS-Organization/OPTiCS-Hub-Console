@@ -54,13 +54,27 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.5.1",
+    codename: undefined,
+    date: "2026-08-13",
+    highlight: true,
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.5.0", to: "0.5.1" },
+      { scope: "OPTiCS Console", from: "0.5.0", to: "0.5.1" },
+    ],
+    changes: [
+      { kind: "fixed", description: "Console에서 불필요한 UI 요소를 삭제했습니다." },
+      { kind: "security", description: "CSRF 보안 취약점을 패치했습니다." },
+    ]
+  },
+  {
     version: "0.5.0",
     codename: "Airglow",
-    date: "2026-08-10",
-    highlight: true,
-    warning: "이번 업데이트를 적용하려면 OPTiCS Agent 0.5.0으로 수동 업그레이드해야 합니다.",
+    date: "2026-08-11",
+    warning: "이 업데이트를 적용하려면 OPTiCS Agent 0.5.0 수동 업그레이드가 필요합니다.",
     versions: [
       { scope: "OPTiCS Hub", from: "0.4.0", to: "0.5.0" },
+      { scope: "OPTiCS Console", from: "0.3.1", to: "0.5.0" },
       { scope: "OPTiCS Agent", from: "0.3.0", to: "0.5.0" },
       { scope: "OPTiCS Installer (Linux)", from: "0.2.0", to: "0.3.3" },
       { scope: "OPTiCS Installer (Windows)", from: "0.2.0", to: "0.2.0" },

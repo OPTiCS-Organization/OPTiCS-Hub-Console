@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, GitBranch, Globe, Loader2, Package, Pencil, Play, Plus, Square, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, GitBranch, Loader2, Package, Pencil, Play, Plus, Square, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
@@ -12,12 +12,6 @@ import ServiceForm from "../components/service/ServiceForm";
 import LogPanel from "../components/service/LogPanel";
 
 type TabKey = 'overview' | 'containers' | 'logs';
-
-// 서비스 서브도메인 + 워크스페이스 서브도메인 → 접속 가능한 전체 URL
-function buildServiceUrl(serviceSubdomain: string, workspaceSubdomain: string): string {
-  if (serviceSubdomain === '') return `https://${workspaceSubdomain}.optics.run/`;
-  return `https://${serviceSubdomain}.${workspaceSubdomain}.optics.run/`;
-}
 
 function parseSourceRepositories(raw: string) {
   try {
@@ -333,10 +327,6 @@ export default function ServiceDetail() {
 
   const [activeTab, setActiveTab] = useState<TabKey>('logs');
 
-  const [subdomainEditing, setSubdomainEditing] = useState(false);
-  const [subdomainInput, setSubdomainInput] = useState('');
-  const [subdomainError, setSubdomainError] = useState<string | null>(null);
-
   const {
     logs, setLogs,
     expandedSessions, setExpandedSessions,
@@ -401,11 +391,6 @@ export default function ServiceDetail() {
     );
   }
   const isRemoved = service.serviceStatus === 'removed';
-  const serviceSubdomain = service.serviceSubdomain ?? null;
-  const hasServiceSubdomain = serviceSubdomain !== null;
-  const serviceUrl = hasServiceSubdomain && currentWorkspace?.workspaceSubdomain && currentWorkspace.workspaceSubdomainActive
-    ? buildServiceUrl(serviceSubdomain, currentWorkspace.workspaceSubdomain)
-    : null;
   const portMappings = service.servicePortMappings && service.servicePortMappings.length > 0
     ? service.servicePortMappings
     : [{ hostPort: service.serviceHostPort ?? service.servicePort, containerPort: service.serviceContainerPort ?? service.servicePort }];
@@ -437,33 +422,6 @@ export default function ServiceDetail() {
       if (!res.ok) console.log(await res.json());
     } catch (error) {
       console.log(error);
-    }
-  }
-
-  async function handleSaveSubdomain() {
-    const rawValue = subdomainInput.trim().toLowerCase();
-    if (rawValue !== '' && rawValue !== '@' && (rawValue.length > 63 || !/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(rawValue))) {
-      setSubdomainError('소문자/숫자/하이픈 또는 @만 사용할 수 있습니다.');
-      return;
-    }
-    try {
-      const res = await apiFetch(`/v1/service/${serviceIndex}/subdomain`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subdomain: rawValue === '' ? null : rawValue }),
-      }, logout);
-      if (!res.ok) {
-        setSubdomainError(res.status === 409 ? '이미 사용 중인 서브도메인입니다.' : '저장에 실패했습니다.');
-        return;
-      }
-      const body = await res.json() as { data?: { service?: { serviceSubdomain?: string | null } } };
-      const nextSubdomain = body.data?.service?.serviceSubdomain ?? null;
-      setService(prev => prev ? { ...prev, serviceSubdomain: nextSubdomain } : prev);
-      setSubdomainEditing(false);
-      setSubdomainError(null);
-    } catch (error) {
-      console.log(error);
-      setSubdomainError('저장에 실패했습니다.');
     }
   }
 
@@ -695,55 +653,6 @@ export default function ServiceDetail() {
                     ))}
                   </div>
                 )}
-            </InfoRow>
-            <InfoRow label="서브도메인">
-              <div className="flex items-center gap-1.5">
-                <Globe className="w-3 h-3 shrink-0 text-secondary-text-color/60" />
-                {subdomainEditing ? (
-                  <>
-                    <input
-                      value={subdomainInput}
-                      onChange={e => { setSubdomainInput(e.target.value); setSubdomainError(null); }}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') void handleSaveSubdomain();
-                        if (e.key === 'Escape') { setSubdomainEditing(false); setSubdomainError(null); }
-                      }}
-                      placeholder="api 또는 @"
-                      autoFocus
-                      className="w-40 rounded border border-border-color bg-transparent px-1.5 py-0.5 font-mono text-xs text-primary-text-color outline-none focus:border-service-color"
-                    />
-                    <Check className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-green-400 transition-colors" onClick={() => { void handleSaveSubdomain(); }} />
-                    <X className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => { setSubdomainEditing(false); setSubdomainError(null); }} />
-                  </>
-                ) : (
-                  <>
-                    {serviceUrl ? (
-                      <a
-                        href={serviceUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-service-color hover:underline truncate"
-                      >
-                        {serviceUrl}
-                      </a>
-                    ) : hasServiceSubdomain && currentWorkspace?.workspaceSubdomain ? (
-                      <span className="font-mono text-secondary-text-color/70">
-                        {buildServiceUrl(serviceSubdomain, currentWorkspace.workspaceSubdomain)}
-                        <span className="ml-1 text-secondary-text-color/50">(비활성)</span>
-                      </span>
-                    ) : (
-                      <span className="font-mono text-secondary-text-color/50">미설정</span>
-                    )}
-                    {!isRemoved && (
-                      <Pencil
-                        className="w-3 h-3 shrink-0 cursor-pointer text-secondary-text-color/60 hover:text-primary-text-color transition-colors"
-                        onClick={() => { setSubdomainInput(service.serviceSubdomain === '' ? '@' : service.serviceSubdomain ?? ''); setSubdomainEditing(true); }}
-                      />
-                    )}
-                  </>
-                )}
-                {subdomainError && <span className="text-red-400">{subdomainError}</span>}
-              </div>
             </InfoRow>
             <InfoRow label="생성일">
               <span className="text-secondary-text-color/80">{new Date(service.serviceCreatedAt).toLocaleString()}</span>
