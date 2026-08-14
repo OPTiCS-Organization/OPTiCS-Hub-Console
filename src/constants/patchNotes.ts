@@ -54,10 +54,20 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.5.2",
+    codename: undefined,
+    date: "2026-08-14",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.5.1", to: "0.5.2" },
+    ],
+    changes: [
+      { kind: "fixed", description: "재배포 시 배포 대상 Agent 변경 파라미터가 적용되지 않던 문제를 수정했습니다" },
+    ]
+  },
+  {
     version: "0.5.1",
     codename: undefined,
     date: "2026-08-13",
-    highlight: true,
     versions: [
       { scope: "OPTiCS Hub", from: "0.5.0", to: "0.5.1" },
       { scope: "OPTiCS Console", from: "0.5.0", to: "0.5.1" },
