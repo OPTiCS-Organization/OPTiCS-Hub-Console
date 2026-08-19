@@ -54,6 +54,18 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.5.4",
+    codename: undefined,
+    date: "2026-08-19",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.5.3", to: "0.5.4"},
+      { scope: "OPTiCS Console", from: "0.5.3", to: "0.5.4" },
+    ],
+    changes: [
+      { kind: 'fixed', description: "OPTiCS Hub 0.5.3 패치 이후 배포 대상이 변경된 Service 상태 추적이 되지 않던 문제를 수정했습니다." }
+    ]
+  },
+  {
     version: "0.5.3",
     codename: undefined,
     date: "2026-08-19",
