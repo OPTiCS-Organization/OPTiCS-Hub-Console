@@ -325,10 +325,10 @@ export default function ServiceDetail() {
   const { openModal, closeModal } = useModal();
   const { currentWorkspace } = useWorkspace();
 
-  const [activeTab, setActiveTab] = useState<TabKey>('logs');
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
 
   const {
-    logs, setLogs,
+    logs, clearLogs,
     expandedSessions, setExpandedSessions,
     currentSessionId,
     containers,
@@ -711,7 +711,7 @@ export default function ServiceDetail() {
             currentSessionId={currentSessionId}
             expandedSessions={expandedSessions}
             setExpandedSessions={setExpandedSessions}
-            onClear={() => setLogs([])}
+            onClear={clearLogs}
             logEndRef={logEndRef}
             logLoadProgress={logLoadProgress}
             isLoadingOlderLogs={isLoadingOlderLogs}

@@ -5,6 +5,7 @@ import { useWorkspace } from "../context/Workspace.context";
 import { useModal } from "../context/Modal.context";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import packageJson from "../../package.json";
+import { useUnreadPatchNoteCount } from "../hooks/usePatchNoteBadge";
 
 const IconSize = 'w-4 h-4'
 const sectionLabelClass = "px-2 text-[9px] font-medium uppercase tracking-widest text-tertiary-text-color"
@@ -28,6 +29,7 @@ export default function Navigation() {
   const { workspaces, currentWorkspace, isLoading, selectWorkspace } = useWorkspace();
   const { openModal } = useModal();
   const [view, setView] = useState<View>('main');
+  const unreadPatchNotes = useUnreadPatchNoteCount();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -176,7 +178,14 @@ export default function Navigation() {
               to={mainMenu[2].path}
               className={({ isActive }) => navItemClass(isActive)}
             >
-              <span className="shrink-0 text-current">{mainMenu[2].icon}</span>
+              <span className="relative shrink-0 text-current">
+                {mainMenu[2].icon}
+                {/* 확인하지 않은 패치노트가 있으면 아이콘 우상단에 점을 겹친다.
+                    ring은 아이콘 선과 점이 붙어 보이지 않게 배경색으로 띄우는 용도다. */}
+                {unreadPatchNotes !== 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-service-color ring-2 ring-modal-background-color" />
+                )}
+              </span>
               <span className="font-semibold text-current">{mainMenu[2].name}</span>
             </NavLink>
           </>

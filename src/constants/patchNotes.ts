@@ -54,6 +54,24 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.5.3",
+    codename: undefined,
+    date: "2026-08-19",
+    warning: "이 업데이트를 적용하려면 OPTiCS Agent 0.5.3 수동 업그레이드가 필요합니다.",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.5.2", to: "0.5.3"},
+      { scope: "OPTiCS Console", from: "0.5.2", to: "0.5.3" },
+      { scope: "OPTiCS Agent", from: "0.5.0", to: "0.5.3" }
+    ],
+    changes: [
+      { kind: "changed", description: "OPTiCS Agent 백엔드의 동작 안정성이 개선되었습니다." },
+      { kind: "fixed", description: "OPTiCS Hub 0.5.2에서 수정한 재배포 시 Agent 변경 파라미터가 적용되지 않는 문제가 일부 조건에서 남아 있어 추가로 수정했습니다." },
+      { kind: "changed", description: "OPTiCS Console의 Service Detail 페이지의 기본 탭이 로그에서 개요로 변경되었습니다." },
+      { kind: "fixed", description: "OPTiCS Console의 Service Detail/로그 탭의 로그 렌더링 성능을 개선했습니다." },
+      { kind: "added", description: "OPTiCS Console의 Patch Note 탭에 읽음 여부를 표시하는 기능을 추가했습니다." },
+    ]
+  },
+  {
     version: "0.5.2",
     codename: undefined,
     date: "2026-08-14",
@@ -61,7 +79,7 @@ export const patchNotes: PatchNoteEntry[] = [
       { scope: "OPTiCS Hub", from: "0.5.1", to: "0.5.2" },
     ],
     changes: [
-      { kind: "fixed", description: "재배포 시 배포 대상 Agent 변경 파라미터가 적용되지 않던 문제를 수정했습니다" },
+      { kind: "fixed", description: "OPTiCS Console에서 Service 재배포 시 배포 대상 Agent 변경 파라미터가 적용되지 않던 문제를 수정했습니다" },
     ]
   },
   {
@@ -73,8 +91,8 @@ export const patchNotes: PatchNoteEntry[] = [
       { scope: "OPTiCS Console", from: "0.5.0", to: "0.5.1" },
     ],
     changes: [
-      { kind: "fixed", description: "Console에서 불필요한 UI 요소를 삭제했습니다." },
-      { kind: "security", description: "CSRF 보안 취약점을 패치했습니다." },
+      { kind: "fixed", description: "OPTiCS Console에서 불필요한 UI 요소를 삭제했습니다." },
+      { kind: "security", description: "OPTiCS Hub CSRF 보안 취약점을 패치했습니다." },
     ]
   },
   {

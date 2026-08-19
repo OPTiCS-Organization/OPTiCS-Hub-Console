@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, Loader2, Terminal } from "lucide-react";
-import type { LogEntry, LogLoadProgress } from "../../hooks/useServiceLog";
+import { logKey, type LogEntry, type LogLoadProgress } from "../../hooks/useServiceLog";
 
 // 현재 세션에서 한 번에 DOM에 그릴 최대 줄 수. 나머지는 "더보기"로 숨겨 초기 렌더 부하를 막는다.
 const CURRENT_SESSION_RENDER_LIMIT = 1500;
@@ -9,13 +9,24 @@ const CURRENT_SESSION_RENDER_STEP = 3000;
 // 우측 하단 안내 배지: 로딩 완료('loaded')는 현재 렌더 수, 더보기('shown')는 추가로 드러난 수를 보여준다.
 type ToastState = { mode: 'loaded' } | { mode: 'shown'; added: number };
 
+// 같은 타임스탬프 문자열을 리렌더마다 다시 파싱하지 않도록 캐시한다.
+// 버퍼 상한을 넘어서면 통째로 비워 무한정 커지는 것을 막는다.
+const timestampCache = new Map<string, string>();
+
 function formatTimestamp(timestamp: string): string {
+  const cached = timestampCache.get(timestamp);
+  if (cached !== undefined) return cached;
+
   const d = new Date(timestamp);
   const ampm = d.getHours() < 12 ? 'AM' : 'PM';
   const h = String(d.getHours() % 12 || 12).padStart(2, '0');
   const m = String(d.getMinutes()).padStart(2, '0');
   const s = String(d.getSeconds()).padStart(2, '0');
-  return `${ampm} ${h}:${m}:${s}`;
+  const formatted = `${ampm} ${h}:${m}:${s}`;
+
+  if (timestampCache.size > 100000) timestampCache.clear();
+  timestampCache.set(timestamp, formatted);
+  return formatted;
 }
 
 function markerLabel(entry: LogEntry): string {
@@ -67,6 +78,29 @@ function renderLogLine(entry: LogEntry, muted = false) {
   );
 }
 
+// 로그 한 줄. memo로 감싸 새 줄이 붙어도 이미 그려진 줄이 다시 렌더되지 않게 한다.
+// entry 객체는 머지 때만 새로 만들어지므로 얕은 참조 비교로 충분하다.
+const LogRow = memo(function LogRow({ entry, muted = false }: { entry: LogEntry; muted?: boolean }) {
+  if (entry.type === 'marker') {
+    return (
+      <div className={muted ? "flex items-center gap-2 opacity-50 py-0.5" : "flex items-center gap-2 py-0.5"}>
+        <span className={muted ? "text-secondary-text-color/60 shrink-0" : "text-secondary-text-color/40 shrink-0"}>
+          {formatTimestamp(entry.timestamp)}
+        </span>
+        <span className="h-px bg-border-color flex-1" />
+        <span className="text-secondary-text-color/70 text-[10px] shrink-0">{markerLabel(entry)}</span>
+        <span className="h-px bg-border-color flex-1" />
+      </div>
+    );
+  }
+
+  return <div className={muted ? "flex gap-2 opacity-40" : "flex gap-2"}>{renderLogLine(entry, muted)}</div>;
+});
+
+function countLogLines(entries: LogEntry[]): number {
+  return entries.reduce((n, entry) => entry.type === 'marker' ? n : n + 1, 0);
+}
+
 interface LogPanelProps {
   logs: LogEntry[];
   currentSessionId: number;
@@ -80,7 +114,7 @@ interface LogPanelProps {
   onLoadOlder: () => void;
 }
 
-export default function LogPanel({
+function LogPanel({
   logs,
   currentSessionId,
   expandedSessions,
@@ -92,7 +126,17 @@ export default function LogPanel({
   hasOlderLogs,
   onLoadOlder,
 }: LogPanelProps) {
-  const sessions = Array.from(new Set(logs.map(e => e.sessionId))).sort((a, b) => a - b);
+  // 세션별로 한 번만 갈라 둔다. 세션마다 logs.filter를 다시 돌면 O(줄 수 × 세션 수)가 된다.
+  const sessionGroups = useMemo(() => {
+    const groups = new Map<number, LogEntry[]>();
+    logs.forEach((entry) => {
+      const group = groups.get(entry.sessionId);
+      if (group) group.push(entry);
+      else groups.set(entry.sessionId, [entry]);
+    });
+    return Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+  }, [logs]);
+
   // progress 이벤트가 오기 전(에이전트가 docker logs를 읽어 전체 크기를 재는 구간) → 측정 중
   const isMeasuring = !logLoadProgress;
   const isLoadingHistory = logLoadProgress?.phase === 'loading' && logLoadProgress.percent < 100;
@@ -106,20 +150,23 @@ export default function LogPanel({
   const shouldStickToBottomRef = useRef(true);
   const [currentVisibleCount, setCurrentVisibleCount] = useState(CURRENT_SESSION_RENDER_LIMIT);
 
-  // 실제로 DOM에 렌더되는 로그(마커 제외) 수: 접힌 과거 세션은 제외하고, 현재 세션은 상한까지만 센다.
-  const renderedLogCount = sessions.reduce((total, sid) => {
-    const sessionLogs = logs.filter(entry => entry.sessionId === sid);
-    const isCurrent = sid === currentSessionId;
-    if (!isCurrent && !expandedSessions.has(sid)) return total;
-    const visible = isCurrent && sessionLogs.length > currentVisibleCount
-      ? sessionLogs.slice(-currentVisibleCount)
-      : sessionLogs;
-    return total + visible.reduce((n, entry) => entry.type === 'marker' ? n : n + 1, 0);
-  }, 0);
-
   // 토스트: 로딩 완료 직후('loaded')나 더보기 클릭('shown') 시 잠깐 떴다가 5초 뒤 사라진다.
   const [toast, setToast] = useState<ToastState | null>(null);
   const wasLoadingRef = useRef(false);
+
+  // 실제로 DOM에 렌더되는 로그(마커 제외) 수. 토스트 문구에만 쓰이므로 그때만 센다.
+  const needsRenderedCount = toast?.mode === 'loaded';
+  const renderedLogCount = useMemo(() => {
+    if (!needsRenderedCount) return 0;
+    return sessionGroups.reduce((total, [sid, sessionLogs]) => {
+      const isCurrent = sid === currentSessionId;
+      if (!isCurrent && !expandedSessions.has(sid)) return total;
+      const visible = isCurrent && sessionLogs.length > currentVisibleCount
+        ? sessionLogs.slice(-currentVisibleCount)
+        : sessionLogs;
+      return total + countLogLines(visible);
+    }, 0);
+  }, [needsRenderedCount, sessionGroups, currentSessionId, expandedSessions, currentVisibleCount]);
 
   useEffect(() => {
     const loadingNow = isMeasuring || isLoadingHistory;
@@ -201,8 +248,7 @@ export default function LogPanel({
         )}
         {logs.length === 0
           ? (!loadingLabel && <span className="text-[11px] text-secondary-text-color/40">로그 대기 중...</span>)
-          : sessions.map(sid => {
-            const sessionLogs = logs.filter(e => e.sessionId === sid);
+          : sessionGroups.map(([sid, sessionLogs]) => {
             const isCurrent = sid === currentSessionId;
             const isExpanded = expandedSessions.has(sid);
 
@@ -219,17 +265,8 @@ export default function LogPanel({
                   >
                     {isExpanded ? '▾' : '▸'} 이전 세션 로그 {sessionLogs.length}줄
                   </button>
-                  {isExpanded && sessionLogs.map((entry, i) => (
-                    entry.type === 'marker'
-                      ? (
-                        <div key={i} className="flex items-center gap-2 opacity-50 py-0.5">
-                          <span className="text-secondary-text-color/60 shrink-0">{formatTimestamp(entry.timestamp)}</span>
-                          <span className="h-px bg-border-color flex-1" />
-                          <span className="text-secondary-text-color/70 text-[10px] shrink-0">{markerLabel(entry)}</span>
-                          <span className="h-px bg-border-color flex-1" />
-                        </div>
-                      )
-                      : <div key={i} className="flex gap-2 opacity-40">{renderLogLine(entry, true)}</div>
+                  {isExpanded && sessionLogs.map(entry => (
+                    <LogRow key={logKey(entry)} entry={entry} muted />
                   ))}
                 </div>
               );
@@ -244,7 +281,7 @@ export default function LogPanel({
                     onClick={() => {
                       const oldStart = Math.max(0, sessionLogs.length - currentVisibleCount);
                       const newStart = Math.max(0, oldStart - CURRENT_SESSION_RENDER_STEP);
-                      const added = sessionLogs.slice(newStart, oldStart).reduce((n, entry) => entry.type === 'marker' ? n : n + 1, 0);
+                      const added = countLogLines(sessionLogs.slice(newStart, oldStart));
                       setCurrentVisibleCount(prev => prev + CURRENT_SESSION_RENDER_STEP);
                       // 토스트가 이미 '추가 표시' 상태로 떠 있으면 누적, 아니면 새로 시작
                       setToast(prev => prev?.mode === 'shown' ? { mode: 'shown', added: prev.added + added } : { mode: 'shown', added });
@@ -254,17 +291,8 @@ export default function LogPanel({
                     ▴ 이전 줄 {hiddenCount.toLocaleString()}줄 더보기
                   </button>
                 )}
-                {visibleLogs.map((entry, i) => (
-                  entry.type === 'marker'
-                    ? (
-                      <div key={`${sid}-${i}`} className="flex items-center gap-2 py-0.5">
-                        <span className="text-secondary-text-color/40 shrink-0">{formatTimestamp(entry.timestamp)}</span>
-                        <span className="h-px bg-border-color flex-1" />
-                        <span className="text-secondary-text-color/70 text-[10px] shrink-0">{markerLabel(entry)}</span>
-                        <span className="h-px bg-border-color flex-1" />
-                      </div>
-                    )
-                    : <div key={`${sid}-${i}`} className="flex gap-2">{renderLogLine(entry)}</div>
+                {visibleLogs.map(entry => (
+                  <LogRow key={logKey(entry)} entry={entry} />
                 ))}
               </div>
             );
@@ -303,3 +331,6 @@ export default function LogPanel({
     </div>
   );
 }
+
+// ServiceDetail의 다른 상태 변화(탭·모달·폼 등)로 인한 리렌더가 로그 목록까지 다시 그리지 않게 막는다.
+export default memo(LogPanel);
