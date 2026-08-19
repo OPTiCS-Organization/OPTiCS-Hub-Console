@@ -19,6 +19,8 @@ COPY package*.json ./
 RUN npm ci
 
 COPY --from=build /app/dist ./dist
+# preview도 allowedHosts를 검사하므로 설정 파일이 런타임 스테이지에 있어야 한다.
+COPY vite.config.ts ./
 
 EXPOSE 5173
 
