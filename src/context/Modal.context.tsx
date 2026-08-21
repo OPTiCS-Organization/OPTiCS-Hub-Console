@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import Tooltip from "../components/ui/Tooltip";
 
 interface ModalState {
   title: string;
@@ -51,12 +52,16 @@ export function ModalProvider({ children }: { children: ReactNode }) {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-border-color px-4 py-3">
               <span className="text-primary-text-color font-semibold text-sm">{modal.title}</span>
-              <button
-                onClick={() => closeModal()}
-                className="text-secondary-text-color hover:text-primary-text-color transition-colors duration-100 cursor-pointer leading-none"
-              >
-                ✕
-              </button>
+              <Tooltip label="닫기">
+                <button
+                  type="button"
+                  onClick={() => closeModal()}
+                  aria-label="닫기"
+                  className="text-secondary-text-color hover:text-primary-text-color transition-colors duration-100 cursor-pointer leading-none"
+                >
+                  ✕
+                </button>
+              </Tooltip>
             </div>
 
             {/* Content */}

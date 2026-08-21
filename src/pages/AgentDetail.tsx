@@ -17,6 +17,7 @@ import { useAuth } from '../context/Auth.context';
 import { useModal } from '../context/Modal.context';
 import { useWorkspace } from '../context/Workspace.context';
 import { apiFetch } from '../lib/apiFetch';
+import Tooltip from '../components/ui/Tooltip';
 
 type TabKey = 'overview' | 'terminal';
 
@@ -324,15 +325,27 @@ export default function AgentDetail() {
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
-          <RefreshCw
-            className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors"
-            onClick={() => { void loadAgent(); }}
-          />
+          <Tooltip label="새로고침" side="bottom">
+            <button
+              type="button"
+              onClick={() => { void loadAgent(); }}
+              className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+              aria-label="새로고침"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </Tooltip>
           {agent.agentConnection === 'linked' && (
-            <Unlink
-              className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors"
-              onClick={handleDisconnect}
-            />
+            <Tooltip label="에이전트와의 연결을 해제합니다" side="bottom">
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                className="p-1 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer"
+                aria-label="연결 해제"
+              >
+                <Unlink className="w-4 h-4" />
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>

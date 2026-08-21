@@ -54,6 +54,19 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.5.5",
+    codename: undefined,
+    date: "2026-08-21",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.5.4", to: "0.5.5" },
+      { scope: "OPTiCS Console", from: "0.5.4", to: "0.5.5" },
+    ],
+    changes: [
+      { kind: 'added', description: "OPTiCS Gateway에서 서비스 라우팅 실패 시 실패 원인 피드백 기능을 추가했습니다." },
+      { kind: 'added', description: "OPTiCS Console의 일부 버튼에 해당 버튼의 기능을 설명하는 UI를 추가했습니다." },
+    ]
+  },
+  {
     version: "0.5.4",
     codename: undefined,
     date: "2026-08-19",

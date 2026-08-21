@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useModal } from "../context/Modal.context";
 import { apiFetch } from "../lib/apiFetch";
 import TotpCodeInput from "./TotpCodeInput";
+import Tooltip from "./ui/Tooltip";
 
 type ApiResponse = {
   data?: {
@@ -178,14 +179,16 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
             <p className="text-[11px] font-medium uppercase tracking-wider text-secondary-text-color">수동 설정 키</p>
             <div className="mt-1 flex items-center gap-2">
               <code className="min-w-0 flex-1 break-all text-xs tracking-wider text-primary-text-color">{secret}</code>
-              <button
-                type="button"
-                onClick={() => void copySecret()}
-                aria-label="수동 설정 키 복사"
-                className="shrink-0 cursor-pointer rounded-sm p-1.5 text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color"
-              >
-                {isCopied ? <Check className="h-4 w-4 text-success-color" /> : <Copy className="h-4 w-4" />}
-              </button>
+              <Tooltip label="설정 키 복사">
+                <button
+                  type="button"
+                  onClick={() => void copySecret()}
+                  aria-label="수동 설정 키 복사"
+                  className="shrink-0 cursor-pointer rounded-sm p-1.5 text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color"
+                >
+                  {isCopied ? <Check className="h-4 w-4 text-success-color" /> : <Copy className="h-4 w-4" />}
+                </button>
+              </Tooltip>
             </div>
           </div>
         )}

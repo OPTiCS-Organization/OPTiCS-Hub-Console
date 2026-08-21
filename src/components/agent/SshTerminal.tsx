@@ -4,6 +4,7 @@ import '@xterm/xterm/css/xterm.css';
 import { X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
+import Tooltip from '../ui/Tooltip';
 
 type SshTerminalProps = {
   socket: Socket;
@@ -110,14 +111,16 @@ export default function SshTerminal({ socket, token, onClose }: SshTerminalProps
           <span className={`h-2 w-2 rounded-full ${status === '연결됨' ? 'bg-success-color' : 'bg-warning-color'}`} />
           <span className="text-xs text-secondary-text-color">{status}</span>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer rounded-sm p-1 text-secondary-text-color hover:bg-white/5 hover:text-primary-text-color"
-          aria-label="터미널 닫기"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <Tooltip label="터미널 닫기">
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded-sm p-1 text-secondary-text-color hover:bg-white/5 hover:text-primary-text-color"
+            aria-label="터미널 닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </Tooltip>
       </div>
       <div ref={containerRef} className="h-[460px] w-full p-2" />
     </section>

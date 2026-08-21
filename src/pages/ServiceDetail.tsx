@@ -10,6 +10,7 @@ import { statusDot, statusLabel, presetLabel } from "../constants/service";
 import type { ServiceEndpoint, ServiceItem } from "../interfaces/ServiceItem.interface";
 import ServiceForm from "../components/service/ServiceForm";
 import LogPanel from "../components/service/LogPanel";
+import Tooltip from "../components/ui/Tooltip";
 
 type TabKey = 'overview' | 'containers' | 'logs';
 
@@ -276,9 +277,11 @@ function EndpointEditor({
               value={entry.containerPort}
               onChange={e => updateEndpoint(index, 'containerPort', e.target.value)}
             />
-            <button type="button" onClick={() => removeEndpoint(index)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
-              <X className="h-3.5 w-3.5" />
-            </button>
+            <Tooltip label="엔드포인트 제거">
+              <button type="button" onClick={() => removeEndpoint(index)} aria-label="엔드포인트 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
           </div>
         ))}
       </div>
@@ -539,18 +542,51 @@ export default function ServiceDetail() {
         <div className="flex shrink-0 items-center gap-3">
           {!isRemoved && (
             <>
-              <Play className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => handleStartService()} />
-              <Square className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleStopService()} />
+              <Tooltip label="서비스 시작">
+                <button
+                  type="button"
+                  onClick={() => handleStartService()}
+                  className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                  aria-label="서비스 시작"
+                >
+                  <Play className="w-4 h-4" />
+                </button>
+              </Tooltip>
+              <Tooltip label="서비스 중지">
+                <button
+                  type="button"
+                  onClick={() => handleStopService()}
+                  className="p-1 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer"
+                  aria-label="서비스 중지"
+                >
+                  <Square className="w-4 h-4" />
+                </button>
+              </Tooltip>
             </>
           )}
-          <RefreshCw
-            className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors"
-            onClick={() => {
-              if (!service || !currentWorkspace) return;
-              openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { void fetchService(); }} />);
-            }}
-          />
-          <Trash2 className="w-4 h-4 cursor-pointer text-secondary-text-color hover:text-red-400 transition-colors" onClick={() => handleDeleteService()} />
+          <Tooltip label="재배포">
+            <button
+              type="button"
+              onClick={() => {
+                if (!service || !currentWorkspace) return;
+                openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { void fetchService(); }} />);
+              }}
+              className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+              aria-label="재배포"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip label="서비스 삭제">
+            <button
+              type="button"
+              onClick={() => handleDeleteService()}
+              className="p-1 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer"
+              aria-label="서비스 삭제"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -606,14 +642,16 @@ export default function ServiceDetail() {
                   )}
                 </div>
                 {!isRemoved && (
-                  <button
-                    type="button"
-                    onClick={handleEditEndpoints}
-                    className="mt-0.5 shrink-0 text-secondary-text-color/60 transition-colors hover:text-primary-text-color cursor-pointer"
-                    aria-label="엔드포인트 편집"
-                  >
-                    {endpoints.length === 0 ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
-                  </button>
+                  <Tooltip label={endpoints.length === 0 ? "엔드포인트 추가" : "엔드포인트 편집"}>
+                    <button
+                      type="button"
+                      onClick={handleEditEndpoints}
+                      className="mt-0.5 p-0.5 shrink-0 text-secondary-text-color/60 transition-colors hover:text-primary-text-color cursor-pointer"
+                      aria-label={endpoints.length === 0 ? "엔드포인트 추가" : "엔드포인트 편집"}
+                    >
+                      {endpoints.length === 0 ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
+                    </button>
+                  </Tooltip>
                 )}
               </div>
             </InfoRow>
@@ -689,13 +727,40 @@ export default function ServiceDetail() {
                     )}
                     <div className="ml-auto flex items-center gap-2">
                       {!isRemoved && (c.status === 'stopped' || c.status === 'failed') && (
-                        <Play className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'start'); }} />
+                        <Tooltip label="컨테이너 시작">
+                          <button
+                            type="button"
+                            onClick={() => { void handleContainerAction(c.name, 'start'); }}
+                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                            aria-label="컨테이너 시작"
+                          >
+                            <Play className="w-3 h-3" />
+                          </button>
+                        </Tooltip>
                       )}
                       {!isRemoved && (c.status === 'running' || c.status === 'starting') && (
-                        <Square className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'stop'); }} />
+                        <Tooltip label="컨테이너 중지">
+                          <button
+                            type="button"
+                            onClick={() => { void handleContainerAction(c.name, 'stop'); }}
+                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                            aria-label="컨테이너 중지"
+                          >
+                            <Square className="w-3 h-3" />
+                          </button>
+                        </Tooltip>
                       )}
                       {!isRemoved && c.status === 'running' && (
-                        <RefreshCw className="w-3 h-3 cursor-pointer text-secondary-text-color hover:text-primary-text-color transition-colors" onClick={() => { void handleContainerAction(c.name, 'restart'); }} />
+                        <Tooltip label="컨테이너 재시작">
+                          <button
+                            type="button"
+                            onClick={() => { void handleContainerAction(c.name, 'restart'); }}
+                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                            aria-label="컨테이너 재시작"
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                          </button>
+                        </Tooltip>
                       )}
                     </div>
                   </div>

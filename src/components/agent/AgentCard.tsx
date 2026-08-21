@@ -1,4 +1,5 @@
 import { ServerCog } from "lucide-react";
+import Tooltip from "../ui/Tooltip";
 
 export interface Agent {
   agentIndex: number;
@@ -102,21 +103,27 @@ export default function AgentCard({ agent, onOpen, onDisconnect, onCancel }: Age
           {agent.agentStatus === 'online' ? '현재 온라인' : `마지막 온라인 ${formatRelative(agent.agentLastOnline)}`}
         </span>
         {agent.agentConnection === 'linked' ? (
-          <button
-            type="button"
-            onClick={event => { event.stopPropagation(); onDisconnect?.(agent); }}
-            className="text-[10px] px-2 py-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
-          >
-            연결 해제
-          </button>
+          <Tooltip label="에이전트와의 연결을 해제합니다">
+            <button
+              type="button"
+              onClick={event => { event.stopPropagation(); onDisconnect?.(agent); }}
+              className="text-[10px] px-2 py-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+              aria-label="연결 해제"
+            >
+              연결 해제
+            </button>
+          </Tooltip>
         ) : agent.agentConnection === 'requested' ? (
-          <button
-            type="button"
-            onClick={event => { event.stopPropagation(); onCancel?.(agent); }}
-            className="text-[10px] px-2 py-1 rounded-sm bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors cursor-pointer"
-          >
-            요청 취소
-          </button>
+          <Tooltip label="연결 요청을 취소합니다">
+            <button
+              type="button"
+              onClick={event => { event.stopPropagation(); onCancel?.(agent); }}
+              className="text-[10px] px-2 py-1 rounded-sm bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors cursor-pointer"
+              aria-label="요청 취소"
+            >
+              요청 취소
+            </button>
+          </Tooltip>
         ) : (
           <span className="text-secondary-text-color/60 text-[10px]">
             등록 {formatRelative(agent.agentCreatedAt)}

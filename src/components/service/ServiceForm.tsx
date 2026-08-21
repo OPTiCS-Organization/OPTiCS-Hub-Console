@@ -4,6 +4,7 @@ import { apiFetch } from "../../lib/apiFetch";
 import { useAuth } from "../../context/Auth.context";
 import { useModal } from "../../context/Modal.context";
 import { useAgents } from "../../hooks/useAgents";
+import Tooltip from "../ui/Tooltip";
 import type { EnvEntry } from "../../interfaces/EnvEntry.interface";
 import type { ServiceItem } from "../../interfaces/ServiceItem.interface";
 
@@ -666,9 +667,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                     <span className="text-[10px] font-medium uppercase tracking-wider text-tertiary-text-color">Repository {i + 1}</span>
                   </div>
                   {sourceRepositories.length > 1 && (
-                    <button type="button" onClick={() => removeSourceRepository(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                    <Tooltip label="저장소 제거">
+                      <button type="button" onClick={() => removeSourceRepository(i)} className="p-0.5 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer" aria-label="저장소 제거">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
                   )}
                 </div>
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
@@ -775,9 +778,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                   onChange={e => updatePortMapping(index, 'containerPort', e.target.value)}
                   required
                 />
-                <button type="button" onClick={() => removePortMapping(index)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                <Tooltip label="포트 매핑 제거">
+                  <button type="button" onClick={() => removePortMapping(index)} aria-label="포트 매핑 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
               </div>
             ))}
           </div>
@@ -842,9 +847,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                       value={endpoint.containerPort}
                       onChange={e => updateEndpoint(index, 'containerPort', e.target.value)}
                     />
-                    <button type="button" onClick={() => removeEndpoint(index)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
-                      <X className="h-3.5 w-3.5" />
-                    </button>
+                    <Tooltip label="엔드포인트 제거">
+                      <button type="button" onClick={() => removeEndpoint(index)} aria-label="엔드포인트 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </Tooltip>
                   </div>
                 ))}
               </div>
@@ -926,9 +933,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                 onChange={e => updateEnvEntry(i, 'value', e.target.value)}
                 onPaste={e => handleEnvPaste(e, i)}
               />
-              <button type="button" onClick={() => removeEnvEntry(i)} className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <Tooltip label="환경 변수 제거">
+                <button type="button" onClick={() => removeEnvEntry(i)} aria-label="환경 변수 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
             </div>
           ))}
         </div>
@@ -1027,23 +1036,24 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                   const isCurrent = index === currentStepIndex;
                   const isDone = index < currentStepIndex;
                   return (
-                    <button
-                      key={step.key}
-                      type="button"
-                      onClick={() => goToStep(step.key)}
-                      aria-label={step.label}
-                      className="group flex min-w-0 justify-center cursor-pointer"
-                    >
-                      <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border bg-modal-background-color transition-colors ${
-                        isCurrent
-                          ? 'border-service-color text-service-color'
-                          : isDone
-                            ? 'border-service-color/70 text-service-color'
-                          : 'border-border-color text-tertiary-text-color group-hover:border-border-strong-color group-hover:text-secondary-text-color'
-                      }`}>
-                        {isDone ? <Check className="h-2 w-2" /> : <span className={`h-1 w-1 rounded-full ${isCurrent ? 'bg-service-color' : 'bg-current'}`} />}
-                      </span>
-                    </button>
+                    <Tooltip key={step.key} label={step.label}>
+                      <button
+                        type="button"
+                        onClick={() => goToStep(step.key)}
+                        aria-label={step.label}
+                        className="group flex min-w-0 justify-center cursor-pointer"
+                      >
+                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border bg-modal-background-color transition-colors ${
+                          isCurrent
+                            ? 'border-service-color text-service-color'
+                            : isDone
+                              ? 'border-service-color/70 text-service-color'
+                            : 'border-border-color text-tertiary-text-color group-hover:border-border-strong-color group-hover:text-secondary-text-color'
+                        }`}>
+                          {isDone ? <Check className="h-2 w-2" /> : <span className={`h-1 w-1 rounded-full ${isCurrent ? 'bg-service-color' : 'bg-current'}`} />}
+                        </span>
+                      </button>
+                    </Tooltip>
                   );
                 })}
               </div>
