@@ -54,6 +54,22 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.6.0",
+    codename: "Asterism",
+    date: "2026-08-24",
+    highlight: true,
+    warning: "이 업데이트를 적용하려면 OPTiCS Agent 0.6.0 수동 업데이트가 필요합니다.",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.5.5", to: "0.6.0" },
+      { scope: "OPTiCS Console", from: "0.5.5", to: "0.6.0" },
+      { scope: "OPTiCS Agent", from: "0.5.3", to: "0.6.0" },
+    ],
+    changes: [
+      { kind: 'added', description: "OPTiCS Console에서 OPTiCS Agent를 원격으로 업데이트하는 기능을 추가했습니다." },
+      { kind: 'fixed', description: "응답 본문이 수신 도중 중단되는 문제를 수정했습니다. (모니터링 필요)" },
+    ]
+  },
+  {
     version: "0.5.5",
     codename: undefined,
     date: "2026-08-21",

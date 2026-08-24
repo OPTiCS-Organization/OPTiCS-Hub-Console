@@ -1,7 +1,7 @@
 {
   "name": "optics-hub-console",
   "private": true,
-  "version": "0.5.5",
+  "version": "0.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

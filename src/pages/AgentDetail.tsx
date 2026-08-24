@@ -11,6 +11,7 @@ import {
   statusDot,
   statusLabel,
 } from '../components/agent/AgentCard';
+import AgentUpdateStatus from "../components/agent/AgentUpdateStatus";
 import SshTerminal from '../components/agent/SshTerminal';
 import TerminalAuthModal from '../components/agent/TerminalAuthModal';
 import { useAuth } from '../context/Auth.context';
@@ -194,6 +195,7 @@ export default function AgentDetail() {
       setMemHistory(prev => [...prev, payload.metrics.memory.usage].slice(-30));
     });
     connection.on('agent-updated', () => { void loadAgent(); });
+    connection.on('agent-update', () => { void loadAgent(); });
     const timer = window.setInterval(requestMetrics, 2000);
 
     return () => {
@@ -211,6 +213,17 @@ export default function AgentDetail() {
         onAuthorized={setTerminalToken}
       />
     ));
+  }
+
+  /** 성공/실패 표시를 닫는다. 결과는 사용자가 볼 때까지 남아 있어야 하므로 자동으로 지우지 않는다. */
+  async function acknowledgeUpdate() {
+    if (!agent) return;
+    await apiFetch(
+      `/v1/agent/${encodeURIComponent(agent.agentUuid)}/update/acknowledge`,
+      { method: 'POST' },
+      logout,
+    );
+    void loadAgent();
   }
 
   async function disconnectAgent() {
@@ -390,6 +403,8 @@ export default function AgentDetail() {
                 icon={<MemoryStick className="h-4 w-4" />}
               />
             </div>
+
+            <AgentUpdateStatus agent={agent} onAcknowledge={() => void acknowledgeUpdate()} />
 
             <InfoRow label="에이전트 코드">
               <span className="font-mono">{agent.agentCode}</span>

@@ -47,6 +47,8 @@ export default function Agents() {
       socket.emit('subscribe-workspace', { workspaceIndex: currentWorkspace.workspaceIndex });
     });
     socket.on('agent-updated', () => fetchAgents());
+    // 업데이트 단계 전이는 별도 이벤트로 온다. 진행 중에도 카드가 실시간으로 따라가야 한다.
+    socket.on('agent-update', () => fetchAgents());
     return () => { socket.disconnect(); };
   }, [currentWorkspace, fetchAgents]);
 

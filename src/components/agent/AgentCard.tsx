@@ -1,5 +1,6 @@
 import { ServerCog } from "lucide-react";
 import Tooltip from "../ui/Tooltip";
+import { AgentUpdateBadge } from "./AgentUpdateStatus";
 
 export interface Agent {
   agentIndex: number;
@@ -13,6 +14,10 @@ export interface Agent {
   agentLastOnline: string;
   workspaceName: string | null;
   agentVersion: string | null;
+  updatePhase: 'idle' | 'requested' | 'pulling' | 'restarting' | 'succeeded' | 'rolled_back' | 'failed';
+  updateTarget: string | null;
+  updateMessage: string | null;
+  updateStartedAt: string | null;
 }
 
 /** 버전을 보고하지 않는 Agent는 버전 필드가 도입되기 전(0.5.0 미만) 빌드다. */
@@ -96,6 +101,7 @@ export default function AgentCard({ agent, onOpen, onDisconnect, onCancel }: Age
           </p>
         </div>
       </div>
+      <AgentUpdateBadge agent={agent} />
       <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
         <span className="text-secondary-text-color/60 text-[10px] font-mono">
           {formatAgentVersion(agent.agentVersion)}
