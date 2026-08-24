@@ -1,4 +1,4 @@
-import { Loader2, CheckCircle2, AlertTriangle, Undo2 } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, Undo2, ArrowUpCircle } from "lucide-react";
 import type { Agent } from "./AgentCard";
 
 export type UpdatePhase = Agent['updatePhase'];
@@ -59,9 +59,22 @@ function PhaseIcon({ phase, spinning }: { phase: Exclude<UpdatePhase, 'idle'>; s
   return <AlertTriangle className="w-3.5 h-3.5 shrink-0" />;
 }
 
-/** 카드에 얹는 한 줄짜리 요약. */
-export function AgentUpdateBadge({ agent }: { agent: Agent }) {
-  if (agent.updatePhase === 'idle') return null;
+/**
+ * 카드에 얹는 한 줄짜리 요약.
+ * 진행 중이 아니더라도 올릴 수 있는 버전이 있으면 알린다.
+ * 목록에서 보이지 않으면 사용자는 에이전트마다 상세로 들어가 봐야 업데이트 존재를 알게 된다.
+ */
+export function AgentUpdateBadge({ agent, upgradeTo }: { agent: Agent; upgradeTo?: string | null }) {
+  if (agent.updatePhase === 'idle') {
+    if (!upgradeTo) return null;
+    return (
+      <div className="px-4 py-1.5 border-t border-service-color/20 bg-service-color/5 flex items-center gap-1.5 text-[10px] text-service-color">
+        <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
+        <span className="font-medium">업데이트 가능</span>
+        <span className="font-mono opacity-70">v{upgradeTo}</span>
+      </div>
+    );
+  }
   const phase = PHASE[agent.updatePhase];
 
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { patchNotes, changeKindLabel, changeKindDotClass, changeKindOrder } from "../constants/patchNotes";
+import { patchNotes, changeKindLabel, changeKindDotClass, changeKindOrder, betaBadgeClass } from "../constants/patchNotes";
 import packageJson from "../../package.json";
 import { markPatchNotesSeen, useUnreadPatchNoteCount } from "../hooks/usePatchNoteBadge";
 
@@ -129,6 +129,11 @@ export default function PatchNotes() {
                                 key={i}
                                 className="text-secondary-text-color text-sm leading-relaxed break-keep wrap-break-word text-pretty relative before:absolute before:-left-3 before:text-tertiary-text-color before:content-['·']"
                               >
+                                {change.beta && (
+                                  <span className={`mr-1.5 align-[0.1em] inline-block rounded-full px-1.5 py-0.5 text-[9px] font-semibold tracking-wider ${betaBadgeClass}`}>
+                                    BETA
+                                  </span>
+                                )}
                                 {change.description}
                               </li>
                             ))}

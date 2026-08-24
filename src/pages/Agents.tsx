@@ -180,6 +180,7 @@ export default function Agents() {
               <AgentCard
                 key={agent.agentIndex}
                 agent={agent}
+                upgradeTo={agent.upgrade?.version ?? null}
                 onOpen={selected => navigate(`/agents/${selected.agentUuid}`)}
                 onDisconnect={handleDisconnectAgent}
                 onCancel={handleCancelAgent}

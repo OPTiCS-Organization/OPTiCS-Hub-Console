@@ -12,6 +12,7 @@ import {
   statusLabel,
 } from '../components/agent/AgentCard';
 import AgentUpdateStatus from "../components/agent/AgentUpdateStatus";
+import AgentUpdatePanel, { type AgentUpgrade } from "../components/agent/AgentUpdatePanel";
 import SshTerminal from '../components/agent/SshTerminal';
 import TerminalAuthModal from '../components/agent/TerminalAuthModal';
 import { useAuth } from '../context/Auth.context';
@@ -148,6 +149,7 @@ export default function AgentDetail() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [terminalToken, setTerminalToken] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [updating, setUpdating] = useState(false);
 
   const loadAgent = useCallback(async () => {
     if (!currentWorkspace) {
@@ -212,6 +214,62 @@ export default function AgentDetail() {
         agentUuid={agent.agentUuid}
         onAuthorized={setTerminalToken}
       />
+    ));
+  }
+
+  async function requestUpdate(release: AgentUpgrade) {
+    if (!agent) return;
+    setUpdating(true);
+    try {
+      const response = await apiFetch(
+        `/v1/agent/${encodeURIComponent(agent.agentUuid)}/update`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ version: release.version }),
+        },
+        logout,
+      );
+      if (response.ok) closeModal({ force: true });
+      // 이후 진행 상황은 Hub가 agent-update 이벤트로 밀어준다. 여기서 폴링하지 않는다.
+      void loadAgent();
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  function handleUpdate(release: AgentUpgrade) {
+    if (!agent) return;
+    openModal('에이전트 업데이트', (
+      <div className="space-y-4">
+        <p className="text-xs text-secondary-text-color">
+          '{agent.agentName}'을(를) v{release.version}(으)로 업데이트합니다.
+          교체하는 동안 <strong className="text-primary-text-color">5~10초 정도 연결이 끊깁니다.</strong>
+          이 에이전트가 배포한 서비스는 계속 실행되지만, 그동안 로그 수집과 웹 터미널은 중단됩니다.
+        </p>
+        <p className="text-xs text-secondary-text-color">
+          새 버전이 기동에 실패하면 자동으로 이전 버전으로 되돌아갑니다.
+        </p>
+        <div className="flex justify-end gap-2 border-t border-border-color pt-3">
+          <button
+            type="button"
+            onClick={() => closeModal()}
+            disabled={updating}
+            className="h-8 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color cursor-pointer disabled:opacity-50"
+          >
+            취소
+          </button>
+          <button
+            type="button"
+            onClick={() => { void requestUpdate(release); }}
+            disabled={updating}
+            className="inline-flex h-8 items-center gap-2 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {updating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            업데이트
+          </button>
+        </div>
+      </div>
     ));
   }
 
@@ -405,6 +463,7 @@ export default function AgentDetail() {
             </div>
 
             <AgentUpdateStatus agent={agent} onAcknowledge={() => void acknowledgeUpdate()} />
+            <AgentUpdatePanel agent={agent} onUpdate={handleUpdate} />
 
             <InfoRow label="에이전트 코드">
               <span className="font-mono">{agent.agentCode}</span>

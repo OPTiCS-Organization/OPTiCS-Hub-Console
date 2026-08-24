@@ -18,6 +18,8 @@ export interface Agent {
   updateTarget: string | null;
   updateMessage: string | null;
   updateStartedAt: string | null;
+  /** 올라갈 수 있는 릴리즈. 판정은 Hub가 한다 (SemVer 비교 + 프로토콜 지원 범위). */
+  upgrade: { version: string; notes: string | null } | null;
 }
 
 /** 버전을 보고하지 않는 Agent는 버전 필드가 도입되기 전(0.5.0 미만) 빌드다. */
@@ -63,12 +65,14 @@ export function formatRelative(dateStr: string) {
 
 interface AgentCardProps {
   agent: Agent;
+  /** 이 Agent가 올릴 수 있는 최신 버전. 없으면 배지를 띄우지 않는다. */
+  upgradeTo?: string | null;
   onOpen?: (agent: Agent) => void;
   onDisconnect?: (agent: Agent) => void;
   onCancel?: (agent: Agent) => void;
 }
 
-export default function AgentCard({ agent, onOpen, onDisconnect, onCancel }: AgentCardProps) {
+export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCancel }: AgentCardProps) {
   return (
     <div
       role={onOpen ? "button" : undefined}
@@ -101,7 +105,7 @@ export default function AgentCard({ agent, onOpen, onDisconnect, onCancel }: Age
           </p>
         </div>
       </div>
-      <AgentUpdateBadge agent={agent} />
+      <AgentUpdateBadge agent={agent} upgradeTo={upgradeTo} />
       <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
         <span className="text-secondary-text-color/60 text-[10px] font-mono">
           {formatAgentVersion(agent.agentVersion)}

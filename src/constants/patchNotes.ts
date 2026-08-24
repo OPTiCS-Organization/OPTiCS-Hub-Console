@@ -23,8 +23,12 @@ export interface PatchNoteEntry {
   warning?: string;
   /** 컴포넌트별 버전 변경 표. Hub 외 Agent/Installer 등도 함께 릴리스될 때만 채운다. */
   versions?: ComponentVersionChange[];
-  changes: { kind: ChangeKind; description: string }[];
+  /** beta: 아직 실험적인 기능. 목록에서 BETA 배지가 붙는다. */
+  changes: { kind: ChangeKind; description: string; beta?: boolean }[];
 }
+
+/** BETA 배지. 종류(kind) 배지와 구분되도록 테두리만 있는 형태로 둔다. */
+export const betaBadgeClass = "border border-warning-color/40 text-warning-color";
 
 export const changeKindLabel: Record<ChangeKind, string> = {
   added: "추가",
@@ -65,7 +69,7 @@ export const patchNotes: PatchNoteEntry[] = [
       { scope: "OPTiCS Agent", from: "0.5.3", to: "0.6.0" },
     ],
     changes: [
-      { kind: 'added', description: "OPTiCS Console에서 OPTiCS Agent를 원격으로 업데이트하는 기능을 추가했습니다." },
+      { kind: 'added', beta: true, description: "OPTiCS Console에서 OPTiCS Agent를 원격으로 업데이트하는 기능을 추가했습니다." },
       { kind: 'fixed', description: "응답 본문이 수신 도중 중단되는 문제를 수정했습니다. (모니터링 필요)" },
     ]
   },
