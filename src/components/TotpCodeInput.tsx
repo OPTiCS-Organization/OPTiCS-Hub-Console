@@ -55,25 +55,29 @@ export default function TotpCodeInput({ value, onChange, disabled = false, autoF
 
   return (
     <div className="flex justify-center gap-1.5" role="group" aria-label="6자리 인증 코드">
-      {Array.from({ length: 6 }, (_, index) => (
-        <input
-          key={index}
-          ref={element => { inputRefs.current[index] = element; }}
-          type="text"
-          inputMode="numeric"
-          autoComplete={index === 0 ? "one-time-code" : "off"}
-          autoFocus={autoFocus && index === 0}
-          value={value[index] === " " ? "" : (value[index] ?? "")}
-          onChange={event => setDigit(index, event.target.value)}
-          onKeyDown={event => handleKeyDown(index, event)}
-          onPaste={handlePaste}
-          onFocus={event => event.currentTarget.select()}
-          aria-label={`인증 코드 ${index + 1}번째 자리`}
-          maxLength={6}
-          disabled={disabled}
-          className="h-10 w-9 rounded-sm border border-border-color bg-modal-box-color p-0 text-center font-mono text-lg text-primary-text-color outline-none transition-colors focus:border-service-color focus:ring-1 focus:ring-service-color/30 disabled:opacity-50"
-        />
-      ))}
+      {Array.from({ length: 6 }, (_, index) => {
+        const digit = value[index] === " " ? "" : (value[index] ?? "");
+        return (
+          <input
+            key={index}
+            ref={element => { inputRefs.current[index] = element; }}
+            type="text"
+            inputMode="numeric"
+            autoComplete={index === 0 ? "one-time-code" : "off"}
+            autoFocus={autoFocus && index === 0}
+            value={digit}
+            onChange={event => setDigit(index, event.target.value)}
+            onKeyDown={event => handleKeyDown(index, event)}
+            onPaste={handlePaste}
+            onFocus={event => event.currentTarget.select()}
+            aria-label={`인증 코드 ${index + 1}번째 자리`}
+            maxLength={6}
+            disabled={disabled}
+            // 채워진 칸은 테두리를 한 단계 밝혀서 붙여넣기·입력 진행 상황이 포커스 없이도 눈에 보이게 한다.
+            className={`h-10 w-9 rounded-sm border bg-modal-box-color p-0 text-center font-mono text-lg text-primary-text-color outline-none transition-colors focus:border-service-color focus:ring-1 focus:ring-service-color/30 disabled:opacity-50 ${digit ? "border-border-strong-color" : "border-border-color"}`}
+          />
+        );
+      })}
     </div>
   );
 }

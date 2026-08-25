@@ -72,7 +72,7 @@ export default function MetricSparkline({
 
   if (!enoughData) {
     return (
-      <div ref={wrapperRef} className="flex h-11 items-center text-[10px] text-secondary-text-color/50">
+      <div ref={wrapperRef} className="flex h-11 items-center text-3xs text-secondary-text-color/50">
         {width > 0 ? '데이터 수집 중' : ''}
       </div>
     );
@@ -107,7 +107,7 @@ export default function MetricSparkline({
     <div className="flex flex-col gap-1">
       <div
         ref={wrapperRef}
-        className="relative cursor-crosshair outline-none"
+        className="relative cursor-crosshair rounded-xs outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
         style={{ height: HEIGHT }}
         tabIndex={0}
         role="img"
@@ -169,8 +169,8 @@ export default function MetricSparkline({
             style={{ left: Math.min(width - 44, Math.max(44, active.point.x)), top: Math.max(18, active.point.y - 6) }}
           >
             {/* 값이 앞서고 이름이 뒤따른다. 읽는 사람은 계열을 이미 알고 숫자를 원한다. */}
-            <span className="text-[11px] font-semibold text-primary-text-color">{percent(active.value)}</span>
-            <span className="ml-1.5 text-[9px] text-secondary-text-color">
+            <span className="text-2xs font-semibold text-primary-text-color">{percent(active.value)}</span>
+            <span className="ml-1.5 text-4xs text-secondary-text-color">
               {secondsAgo === 0 ? '현재' : `${secondsAgo}초 전`}
             </span>
           </div>
@@ -178,7 +178,7 @@ export default function MetricSparkline({
       </div>
 
       {/* 자동 스케일이므로 축을 밝히지 않으면 절대값을 오해한다. */}
-      <div className="flex items-center justify-between text-[9px] font-mono text-secondary-text-color/40">
+      <div className="flex items-center justify-between text-4xs font-mono text-secondary-text-color/40">
         <span>최근 {windowSeconds}초</span>
         <span>{percent(low)} ~ {percent(high)}</span>
       </div>

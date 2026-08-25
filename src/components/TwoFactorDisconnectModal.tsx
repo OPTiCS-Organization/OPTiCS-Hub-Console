@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useModal } from "../context/Modal.context";
 import { apiFetch } from "../lib/apiFetch";
 import TotpCodeInput from "./TotpCodeInput";
+import { dangerNoticeClass, dangerSolidButtonClass } from "../constants/danger";
 
 type TwoFactorDisconnectModalProps = {
   onDisconnected: () => void;
@@ -47,7 +48,7 @@ export default function TwoFactorDisconnectModal({ onDisconnected }: TwoFactorDi
 
   return (
     <form onSubmit={handleDisconnect} className="flex flex-col gap-4">
-      <div className="flex items-start gap-3 rounded-sm border border-danger-color/30 bg-danger-color/10 p-3">
+      <div className={`${dangerNoticeClass} flex items-start gap-3`}>
         <ShieldOff className="mt-0.5 h-5 w-5 shrink-0 text-danger-color" />
         <div>
           <p className="text-sm font-semibold text-primary-text-color">2단계 인증을 해제하시겠습니까?</p>
@@ -60,7 +61,7 @@ export default function TwoFactorDisconnectModal({ onDisconnected }: TwoFactorDi
       <TotpCodeInput value={totpCode} onChange={setTotpCode} disabled={isSubmitting} />
 
       {error && (
-        <div className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+        <div role="alert" aria-live="polite" className={`${dangerNoticeClass} text-xs text-danger-color`}>
           {error}
         </div>
       )}
@@ -70,14 +71,14 @@ export default function TwoFactorDisconnectModal({ onDisconnected }: TwoFactorDi
           type="button"
           onClick={() => closeModal()}
           disabled={isSubmitting}
-          className="cursor-pointer rounded-sm border border-border-color px-3.5 py-1.5 text-sm text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50"
+          className="inline-flex h-8 cursor-pointer items-center justify-center rounded-sm border border-border-color px-3.5 text-xs text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
         >
           취소
         </button>
         <button
           type="submit"
           disabled={!TOTP_CODE_REGEX.test(totpCode) || isSubmitting}
-          className="flex cursor-pointer items-center gap-2 rounded-sm border border-danger-color bg-danger-color/10 px-3.5 py-1.5 text-sm font-semibold text-danger-color transition-colors hover:bg-danger-color hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          className={`${dangerSolidButtonClass} focus-visible:ring-offset-2 focus-visible:ring-offset-modal-background-color`}
         >
           {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           2단계 인증 해제

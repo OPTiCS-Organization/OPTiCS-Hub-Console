@@ -18,7 +18,7 @@ function renderInline(text: string): ReactNode {
     }
     if (chunk.startsWith('`') && chunk.endsWith('`') && chunk.length > 2) {
       return (
-        <code key={index} className="rounded-xs bg-white/7.5 px-1 py-0.5 font-mono text-[10px]">
+        <code key={index} className="rounded-xs bg-white/7.5 px-1 py-0.5 align-[0.05em] font-mono text-xs">
           {chunk.slice(1, -1)}
         </code>
       );
@@ -35,13 +35,17 @@ export default function ReleaseNotes({ source }: { source: string }) {
   const flushList = () => {
     if (listItems.length === 0) return;
     blocks.push(
-      <ul key={`ul-${blocks.length}`} className="flex flex-col gap-0.5 pl-3">
+      /*
+        불릿을 ::before 절대배치로 달면 top:auto 의 정적 위치가 줄상자 위쪽이라,
+        leading 이 커질수록 점만 글자보다 위로 뜬다. flex 로 놓으면 점과 글줄이
+        같은 줄상자를 공유해 행높이를 바꿔도 항상 첫 줄에 맞고, 여러 줄로 접힐 때
+        내어쓰기도 저절로 된다.
+      */
+      <ul key={`ul-${blocks.length}`} className="mt-1.5 flex flex-col gap-1">
         {listItems.map((item, index) => (
-          <li
-            key={index}
-            className="relative break-keep wrap-break-word before:absolute before:-left-3 before:text-tertiary-text-color before:content-['·']"
-          >
-            {renderInline(item)}
+          <li key={index} className="flex gap-2">
+            <span aria-hidden className="w-1 shrink-0 select-none text-tertiary-text-color">·</span>
+            <span className="min-w-0 break-keep wrap-break-word">{renderInline(item)}</span>
           </li>
         ))}
       </ul>,
@@ -61,7 +65,9 @@ export default function ReleaseNotes({ source }: { source: string }) {
     if (heading) {
       flushList();
       blocks.push(
-        <p key={`h-${blocks.length}`} className="text-[10px] font-semibold uppercase tracking-widest text-secondary-text-color/80">
+        /* 제목은 아래 목록의 머리라 위쪽 여백만 크게 준다. tracking-widest 는
+           한글 제목("수정", "변경")에서 글자가 흩어져 보여 한 단계 줄인다. */
+        <p key={`h-${blocks.length}`} className="mt-4 text-xs font-semibold uppercase leading-normal tracking-wide text-secondary-text-color first:mt-0">
           {renderInline(heading[1])}
         </p>,
       );
@@ -76,12 +82,14 @@ export default function ReleaseNotes({ source }: { source: string }) {
 
     flushList();
     blocks.push(
-      <p key={`p-${blocks.length}`} className="break-keep wrap-break-word">
+      <p key={`p-${blocks.length}`} className="mt-2.5 break-keep wrap-break-word first:mt-0">
         {renderInline(trimmed)}
       </p>,
     );
   }
   flushList();
 
-  return <div className="flex flex-col gap-2 text-[11px] leading-relaxed">{blocks}</div>;
+  // 블록마다 위쪽 여백을 직접 들고 있으므로 컨테이너에서 gap 을 주지 않는다.
+  // 제목 앞과 목록 항목 사이에 필요한 간격이 서로 달라, 일률적인 gap 으로는 안 맞는다.
+  return <div className="text-sm leading-relaxed">{blocks}</div>;
 }

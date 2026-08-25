@@ -1,12 +1,12 @@
 import type { ServiceItem } from "../interfaces/ServiceItem.interface";
 
 export const statusDot: Record<ServiceItem['serviceStatus'], string> = {
-  running: 'bg-green-400',
-  building: 'bg-yellow-400 animate-pulse',
-  starting: 'bg-yellow-400 animate-pulse',
+  running: 'bg-success-color',
+  building: 'bg-warning-color animate-pulse',
+  starting: 'bg-warning-color animate-pulse',
   waiting: 'bg-secondary-text-color/40',
   stopped: 'bg-secondary-text-color/40',
-  failed: 'bg-red-400',
+  failed: 'bg-danger-color',
   removed: 'bg-secondary-text-color/20',
 };
 

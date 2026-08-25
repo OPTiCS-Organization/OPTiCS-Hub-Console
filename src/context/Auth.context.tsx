@@ -71,7 +71,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
 
+  /**
+   * 브라우저에 남는 계정 흔적을 지운다.
+   *
+   * localStorage 는 시크릿 모드나 쿠키 차단 설정에서 접근만 해도 예외를 던지므로
+   * 실패를 흘린다. 여기서 화면이 죽으면 로그아웃 자체가 막힌다.
+   * 패치노트 확인 여부는 계정이 아니라 이 브라우저의 취향이라 남겨 둔다.
+   */
+  function clearLocalAccountData() {
+    try {
+      localStorage.removeItem("currentWorkspaceIndex");
+    } catch {
+      /* 지우지 못해도 다음 로그인에서 목록에 없는 워크스페이스는 걸러진다. */
+    }
+  }
+
+  // 서버가 401 로 세션을 끊은 경우. 이미 무효한 세션이라 서버를 다시 부르지 않는다.
   const forceLogout = useCallback(() => {
+    clearLocalAccountData();
     setUser(null);
     setIsAuthenticated(false);
   }, []);
@@ -125,10 +142,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) await throwApiError(res, "인증 메일 발송에 실패했습니다.");
   }
 
+  /**
+   * 사용자가 직접 누른 로그아웃.
+   *
+   * 화면만 /auth 로 보내면 httpOnly 쿠키와 서버의 Refresh Token 이 그대로 남아
+   * 새로고침 한 번에 세션이 되살아난다. 서버에 토큰 폐기와 쿠키 삭제를 맡기고,
+   * 브라우저에 남은 계정 흔적도 함께 지운다.
+   *
+   * 화면 전환은 서버 응답을 기다리지 않는다. 네트워크가 끊긴 상태에서 로그아웃이
+   * 먹지 않는 것처럼 보이면 안 되고, 폐기는 실패해도 다음 요청에서 401 로 정리된다.
+   */
   function logout() {
+    clearLocalAccountData();
     setUser(null);
     setIsAuthenticated(false);
-    // 필요 시 /auth/logout 엔드포인트 호출
+
+    void apiFetch("/v1/auth/logout", { method: "POST" }).catch(() => {
+      /* 폐기 실패는 사용자가 할 수 있는 일이 없다. 화면은 이미 로그아웃 상태다. */
+    });
   }
 
   return (

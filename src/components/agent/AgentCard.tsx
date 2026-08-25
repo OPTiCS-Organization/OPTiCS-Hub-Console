@@ -1,6 +1,7 @@
 import { ServerCog } from "lucide-react";
 import Tooltip from "../ui/Tooltip";
 import { AgentUpdateBadge } from "./AgentUpdateStatus";
+import { dangerSoftButtonClass } from "../../constants/danger";
 
 export interface Agent {
   agentIndex: number;
@@ -30,11 +31,11 @@ export function formatAgentVersion(version: string | null) {
 }
 
 export const statusDot: Record<Agent['agentStatus'], string> = {
-  online: 'bg-green-400',
+  online: 'bg-success-color',
   offline: 'bg-secondary-text-color/40',
-  waiting: 'bg-yellow-400',
-  restarting: 'bg-yellow-400',
-  failed: 'bg-red-400',
+  waiting: 'bg-warning-color',
+  restarting: 'bg-warning-color',
+  failed: 'bg-danger-color',
 };
 
 export const statusLabel: Record<Agent['agentStatus'], string> = {
@@ -47,7 +48,7 @@ export const statusLabel: Record<Agent['agentStatus'], string> = {
 
 export const connectionBadge: Record<Agent['agentConnection'], string> = {
   linked: 'bg-service-color/15 text-service-color',
-  requested: 'bg-yellow-500/15 text-yellow-400',
+  requested: 'bg-warning-color/15 text-warning-color',
   unlinked: 'bg-white/5 text-secondary-text-color',
 };
 
@@ -95,7 +96,7 @@ export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCa
             <span className="text-primary-text-color font-semibold text-sm truncate">
               {agent.agentName}
             </span>
-            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${connectionBadge[agent.agentConnection]}`}>
+            <span className={`inline-block px-2 py-0.5 rounded-full text-3xs font-medium leading-none shrink-0 ${connectionBadge[agent.agentConnection]}`}>
               {connectionLabel[agent.agentConnection]}
             </span>
           </div>
@@ -108,8 +109,8 @@ export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCa
         </div>
       </div>
       <AgentUpdateBadge agent={agent} upgradeTo={upgradeTo} />
-      <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between">
-        <span className="text-secondary-text-color/60 text-[10px] font-mono">
+      <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate text-secondary-text-color/60 text-3xs font-mono">
           {formatAgentVersion(agent.agentVersion)}
           <span className="mx-1.5 opacity-50">·</span>
           {agent.agentStatus === 'online' ? '현재 온라인' : `마지막 온라인 ${formatRelative(agent.agentLastOnline)}`}
@@ -119,7 +120,7 @@ export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCa
             <button
               type="button"
               onClick={event => { event.stopPropagation(); onDisconnect?.(agent); }}
-              className="text-[10px] px-2 py-1 rounded-sm bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer"
+              className={`${dangerSoftButtonClass} shrink-0 text-3xs px-2 py-1`}
               aria-label="연결 해제"
             >
               연결 해제
@@ -130,14 +131,14 @@ export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCa
             <button
               type="button"
               onClick={event => { event.stopPropagation(); onCancel?.(agent); }}
-              className="text-[10px] px-2 py-1 rounded-sm bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20 transition-colors cursor-pointer"
+              className="shrink-0 text-3xs px-2 py-1 rounded-sm bg-warning-color/10 text-warning-color hover:bg-warning-color/20 transition-colors cursor-pointer"
               aria-label="요청 취소"
             >
               요청 취소
             </button>
           </Tooltip>
         ) : (
-          <span className="text-secondary-text-color/60 text-[10px]">
+          <span className="shrink-0 text-secondary-text-color/60 text-3xs">
             등록 {formatRelative(agent.agentCreatedAt)}
           </span>
         )}

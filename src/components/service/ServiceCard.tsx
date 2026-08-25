@@ -42,10 +42,10 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
             <span className="text-primary-text-color font-semibold text-sm truncate">{service.serviceName}</span>
-            <span className="text-secondary-text-color/60 text-[10px] shrink-0">{presetLabel[service.serviceDeployPreset]}</span>
+            <span className="text-secondary-text-color/60 text-3xs shrink-0">{presetLabel[service.serviceDeployPreset]}</span>
           </div>
-          <div className="flex items-center gap-1 text-[11px]">
-            <span className={`font-medium ${service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : 'text-secondary-text-color'}`}>
+          <div className="flex items-center gap-1 text-2xs">
+            <span className={`font-medium ${service.serviceStatus === 'running' ? 'text-success-color' : service.serviceStatus === 'failed' ? 'text-danger-color' : 'text-secondary-text-color'}`}>
               {statusLabel[service.serviceStatus]}
               {service.serviceStatus === 'running' && containerCounts && containerCounts.total > 0 && (
                 <span className="text-secondary-text-color/60 ml-0.5">
@@ -75,7 +75,7 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
               </div>
             ))}
             {hiddenSourceCount > 0 && (
-              <div className="flex items-center gap-1.5 text-[11px] text-tertiary-text-color">
+              <div className="flex items-center gap-1.5 text-2xs text-tertiary-text-color">
                 <GitBranch className="w-3 h-3 shrink-0" />
                 <span className="font-mono">+{hiddenSourceCount} repositories</span>
               </div>
@@ -89,9 +89,9 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
         )}
       </div>
 
-      <div className="mt-auto flex items-center justify-between border-t border-border-color px-4 py-2.5">
-        <span className="text-secondary-text-color/60 text-[10px] font-mono">{service.serviceVersion}</span>
-        <span className="text-secondary-text-color/60 text-[10px]">
+      <div className="mt-auto flex items-center justify-between gap-2 border-t border-border-color px-4 py-2.5">
+        <span className="shrink-0 text-secondary-text-color/60 text-3xs font-mono">{service.serviceVersion}</span>
+        <span className="min-w-0 truncate text-right text-secondary-text-color/60 text-3xs" title={portMappings.map(mapping => `:${mapping.hostPort} -> :${mapping.containerPort}`).join(', ')}>
           {portMappings.map(mapping => `:${mapping.hostPort} -> :${mapping.containerPort}`).join(', ')}
         </span>
       </div>

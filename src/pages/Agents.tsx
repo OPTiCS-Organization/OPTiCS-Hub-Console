@@ -5,12 +5,15 @@ import { useWorkspace } from "../context/Workspace.context";
 import { useAuth } from "../context/Auth.context";
 import { apiFetch } from "../lib/apiFetch";
 import AgentCard, { type Agent } from "../components/agent/AgentCard";
+import AgentDisconnectConfirm from "../components/agent/AgentDisconnectConfirm";
+import { useModal } from "../context/Modal.context";
 import { useNavigate } from "react-router-dom";
 
 export default function Agents() {
   const navigate = useNavigate();
   const { currentWorkspace, refresh } = useWorkspace();
   const { logout } = useAuth();
+  const { openModal, closeModal } = useModal();
   const [agentCode, setAgentCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -80,7 +83,19 @@ export default function Agents() {
     }
   }
 
-  async function handleDisconnectAgent(agent: Agent) {
+  // 되돌릴 수 없는 동작이라 카드에서 곧바로 실행하지 않고 확인을 한 번 받는다.
+  function handleDisconnectAgent(agent: Agent) {
+    openModal('에이전트 연결 해제 확인', (
+      <AgentDisconnectConfirm
+        agentName={agent.agentName}
+        agentCode={agent.agentCode}
+        onConfirm={() => disconnectAgent(agent)}
+        onCancel={() => closeModal()}
+      />
+    ));
+  }
+
+  async function disconnectAgent(agent: Agent) {
     if (!currentWorkspace) return;
     try {
       const res = await apiFetch(`/v1/workspace/${currentWorkspace.workspaceIndex}/agent/${encodeURIComponent(agent.agentCode)}/disconnect`, {
@@ -89,7 +104,9 @@ export default function Agents() {
       if (!res.ok) {
         const body = await res.json() as { message?: string };
         setMessage({ text: body.message ?? 'Failed.', ok: false });
+        return;
       }
+      closeModal({ force: true });
     } catch {
       setMessage({ text: 'Network error.', ok: false });
     }
@@ -111,7 +128,7 @@ export default function Agents() {
   }
 
   return (
-    <div className="text-primary-text-color mt-20">
+    <div className="text-primary-text-color mt-16">
       <h1 className="text-lg font-bold mb-1">Agents</h1>
       <p className="text-secondary-text-color text-sm mb-6">
         에이전트 연결 코드를 입력해 현재 워크스페이스에 연결 요청을 보내세요.
@@ -132,7 +149,7 @@ export default function Agents() {
             <button
               type="submit"
               disabled={isLoading || !agentCode.trim()}
-              className="px-3 py-2 rounded-sm bg-service-color text-white text-sm font-semibold hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
+              className="shrink-0 px-3 py-2 rounded-sm bg-service-color text-white text-sm font-semibold hover:opacity-80 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer"
             >
               {isLoading
                 ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -143,7 +160,7 @@ export default function Agents() {
           </form>
 
           {message && (
-            <p className={`mt-3 text-xs ${message.ok ? 'text-service-color' : 'text-red-400'}`}>
+            <p className={`mt-3 text-xs ${message.ok ? 'text-service-color' : 'text-danger-color'}`}>
               {message.text}
             </p>
           )}

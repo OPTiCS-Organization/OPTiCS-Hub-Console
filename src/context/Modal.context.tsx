@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import Tooltip from "../components/ui/Tooltip";
+import { dangerSolidButtonClass } from "../constants/danger";
 
 interface ModalState {
   title: string;
@@ -87,7 +88,7 @@ export function ModalProvider({ children }: { children: ReactNode }) {
                     <button
                       type="button"
                       onClick={() => closeModal({ force: true })}
-                      className="h-8 rounded-sm bg-danger-color px-3 text-xs font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer"
+                      className={dangerSolidButtonClass}
                     >
                       닫기
                     </button>

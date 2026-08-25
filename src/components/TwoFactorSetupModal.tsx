@@ -4,6 +4,7 @@ import { useModal } from "../context/Modal.context";
 import { apiFetch } from "../lib/apiFetch";
 import TotpCodeInput from "./TotpCodeInput";
 import Tooltip from "./ui/Tooltip";
+import { dangerNoticeClass } from "../constants/danger";
 
 type ApiResponse = {
   data?: {
@@ -115,7 +116,7 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
         <button
           type="button"
           onClick={() => closeModal({ force: true })}
-          className="mt-4 cursor-pointer rounded-sm bg-service-color px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-button-progress-color"
+          className="mt-4 cursor-pointer rounded-sm bg-service-color px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-button-progress-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50 focus-visible:ring-offset-2 focus-visible:ring-offset-modal-background-color"
         >
           완료
         </button>
@@ -135,11 +136,11 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
   if (!qrOtpUri || !secret) {
     return (
       <div className="flex min-h-52 flex-col items-center justify-center text-center">
-        <p className="text-sm text-red-400">{error || "등록 정보를 불러오지 못했습니다."}</p>
+        <p className="text-sm text-danger-color">{error || "등록 정보를 불러오지 못했습니다."}</p>
         <button
           type="button"
           onClick={() => void loadSetup()}
-          className="mt-4 flex cursor-pointer items-center gap-2 rounded-sm border border-border-color px-4 py-2 text-sm text-primary-text-color transition-colors hover:bg-white/5"
+          className="mt-4 flex cursor-pointer items-center gap-2 rounded-sm border border-border-color px-4 py-2 text-sm text-primary-text-color transition-colors hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
         >
           <RefreshCw className="h-3.5 w-3.5" /> 다시 시도
         </button>
@@ -148,7 +149,7 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
   }
 
   return (
-    <form onSubmit={handleConfirm} className="flex flex-col gap-3.5">
+    <form onSubmit={handleConfirm} className="flex flex-col gap-4">
       <div>
         <p className="text-sm font-semibold text-primary-text-color">1. 인증 앱에 계정을 추가하세요</p>
         <p className="mt-0.5 text-xs leading-relaxed text-secondary-text-color">
@@ -168,7 +169,7 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
           onClick={() => setShowManualKey(current => !current)}
           aria-expanded={showManualKey}
           aria-controls="manual-totp-key"
-          className="flex cursor-pointer items-center gap-1 text-xs text-secondary-text-color transition-colors hover:text-primary-text-color"
+          className="flex cursor-pointer items-center gap-1 rounded-xs text-xs text-secondary-text-color transition-colors hover:text-primary-text-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
         >
           QR 코드를 스캔할 수 없나요? 수동으로 입력
           <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showManualKey ? "rotate-180" : ""}`} />
@@ -176,7 +177,7 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
 
         {showManualKey && (
           <div id="manual-totp-key" className="mt-2 w-full rounded-sm border border-border-color bg-modal-box-color px-3 py-2">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-secondary-text-color">수동 설정 키</p>
+            <p className="text-2xs font-medium uppercase tracking-wider text-secondary-text-color">수동 설정 키</p>
             <div className="mt-1 flex items-center gap-2">
               <code className="min-w-0 flex-1 break-all text-xs tracking-wider text-primary-text-color">{secret}</code>
               <Tooltip label="설정 키 복사">
@@ -184,7 +185,7 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
                   type="button"
                   onClick={() => void copySecret()}
                   aria-label="수동 설정 키 복사"
-                  className="shrink-0 cursor-pointer rounded-sm p-1.5 text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color"
+                  className="shrink-0 cursor-pointer rounded-sm p-1.5 text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
                 >
                   {isCopied ? <Check className="h-4 w-4 text-success-color" /> : <Copy className="h-4 w-4" />}
                 </button>
@@ -204,7 +205,7 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
       </div>
 
       {error && (
-        <div className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+        <div role="alert" aria-live="polite" className={`${dangerNoticeClass} text-xs text-danger-color`}>
           {error}
         </div>
       )}
@@ -214,14 +215,14 @@ export default function TwoFactorSetupModal({ onEnabled }: TwoFactorSetupModalPr
           type="button"
           onClick={() => closeModal()}
           disabled={isConfirming}
-          className="cursor-pointer rounded-sm border border-border-color px-3.5 py-1.5 text-sm text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50"
+          className="cursor-pointer rounded-sm border border-border-color px-3.5 py-1.5 text-sm text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
         >
           취소
         </button>
         <button
           type="submit"
           disabled={!TOTP_CODE_REGEX.test(totpCode) || isConfirming}
-          className="flex cursor-pointer items-center gap-2 rounded-sm bg-service-color px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex cursor-pointer items-center gap-2 rounded-sm bg-service-color px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50 focus-visible:ring-offset-2 focus-visible:ring-offset-modal-background-color"
         >
           {isConfirming && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           활성화

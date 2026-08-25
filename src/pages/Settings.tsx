@@ -99,8 +99,12 @@ export default function Settings() {
         : "인증 앱을 등록해 계정 보안을 강화합니다.";
 
   return (
-    <div className="text-primary-text-color mt-20">
+    <div className="text-primary-text-color mt-16 w-full max-w-4xl mx-auto">
       <h1 className="text-lg font-bold mb-1">Settings</h1>
+      <p className="text-secondary-text-color text-sm break-keep">계정 보안과 알림 환경을 관리합니다.</p>
+
+      {/* 섹션 사이 간격은 페이지가 정한다. WorkspaceSettings 와 같은 리듬을 쓴다. */}
+      <div className="mt-8 flex flex-col gap-8">
       <Section sectionName="Account">
         <SettingOption
           settingName="로그아웃"
@@ -145,6 +149,7 @@ export default function Settings() {
           type={SettingType.Toggle}
         />
       </Section>
+      </div>
     </div>
   )
 }

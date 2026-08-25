@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+import { dangerSoftButtonClass } from "../../constants/danger";
 
 // eslint-disable-next-line react-refresh/only-export-components
 export enum SettingType {
@@ -9,34 +10,54 @@ export enum SettingType {
 }
 
 function ActionButton({ label, onClick, danger, disabled }: { label: string; onClick?: () => void; danger?: boolean; disabled?: boolean }) {
-  const variant = danger ? "hover:bg-red-700 border border-red-700" : "bg-service-color hover:bg-button-progress-color";
+  // danger 변형은 constants/danger.ts 의 soft 규격을 그대로 쓴다. 설정 목록 안에 섞여
+  // 있는 버튼이라 시선을 끌면 안 되는 자리이기 때문이다(문서 참고). 크기/폭은 이 컴포넌트가
+  // 정하고, 고정 높이 + items-center 로 잡아 글자가 위로 쏠리던 문제를 없앤다.
+  if (danger) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={`inline-flex h-8 items-center justify-center px-3.5 text-xs font-semibold ${dangerSoftButtonClass}`}
+      >
+        {label}
+      </button>
+    );
+  }
   return (
-    <button type="button" onClick={onClick} disabled={disabled} className={`text-white text-sm font-semibold px-4 pt-1.5 pb-2.5 rounded-sm cursor-pointer transition-colors duration-100 disabled:opacity-40 disabled:cursor-not-allowed ${variant}`}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex h-8 items-center justify-center rounded-sm bg-service-color px-4 text-sm font-semibold text-white cursor-pointer transition-colors duration-100 hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
+    >
       {label}
     </button>
   );
 }
 
-function InputAction({ value, onChange, placeholder, suffix, maxLength, buttonLabel, onClick, disabled }: { value?: string; onChange?: (v: string) => void; placeholder?: string; suffix?: string; maxLength?: number; buttonLabel?: string; onClick?: () => void; disabled?: boolean }) {
+function InputAction({ id, value, onChange, placeholder, suffix, maxLength, buttonLabel, onClick, disabled }: { id: string; value?: string; onChange?: (v: string) => void; placeholder?: string; suffix?: string; maxLength?: number; buttonLabel?: string; onClick?: () => void; disabled?: boolean }) {
   return (
-    <div className="flex items-center gap-2 w-full justify-end">
-      <div className="flex items-center rounded-sm bg-background-color border border-border-color px-2 focus-within:border-service-color transition-colors duration-100 min-w-0">
+    <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+      <div className="flex min-w-0 flex-1 items-center rounded-sm border border-border-color bg-background-color px-2 transition-colors duration-100 focus-within:border-service-color sm:flex-none">
         <input
+          id={id}
           type="text"
           value={value}
           onChange={e => onChange?.(e.target.value)}
           placeholder={placeholder}
           maxLength={maxLength}
-          className="bg-transparent py-1.5 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none w-32 min-w-0"
+          className="w-full min-w-0 bg-transparent py-1.5 text-sm text-primary-text-color outline-none placeholder:text-secondary-text-color/50 sm:w-32"
         />
-        {suffix && <span className="text-xs text-secondary-text-color whitespace-nowrap">{suffix}</span>}
+        {suffix && <span className="shrink-0 text-xs text-secondary-text-color whitespace-nowrap">{suffix}</span>}
       </div>
       <ActionButton label={buttonLabel ?? "변경"} onClick={onClick} disabled={disabled} />
     </div>
   );
 }
 
-function Toggle({ value, onChange, disabled }: { value?: boolean; onChange?: (next: boolean) => void; disabled?: boolean }) {
+function Toggle({ value, onChange, disabled, label }: { value?: boolean; onChange?: (next: boolean) => void; disabled?: boolean; label: string }) {
   const [internal, setInternal] = useState(false);
   const isControlled = value !== undefined;
   const state = isControlled ? value : internal;
@@ -49,8 +70,15 @@ function Toggle({ value, onChange, disabled }: { value?: boolean; onChange?: (ne
   };
 
   return (
-    <button type="button" onClick={toggle} disabled={disabled} aria-pressed={state} className={`w-10 h-5 rounded-full cursor-pointer transition-colors p-0.5 disabled:cursor-not-allowed disabled:opacity-40 ${state ? "bg-service-color" : "bg-gray-500"}`}>
-      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${state ? "translate-x-5" : "translate-x-0"}`} />
+    <button
+      type="button"
+      onClick={toggle}
+      disabled={disabled}
+      aria-pressed={state}
+      aria-label={label}
+      className={`h-5 w-10 shrink-0 rounded-full p-0.5 cursor-pointer transition-colors disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50 focus-visible:ring-offset-1 focus-visible:ring-offset-background-color ${state ? "bg-service-color" : "bg-border-strong-color"}`}
+    >
+      <div className={`h-4 w-4 rounded-full bg-white transition-transform ${state ? "translate-x-5" : "translate-x-0"}`} />
     </button>
   );
 }
@@ -73,6 +101,10 @@ type SettingOptionProps = {
 };
 
 export function SettingOption({ settingName, description = "", type, buttonLabel, onClick, value, onChange, buttonDisabled, inputValue, onInputChange, inputPlaceholder, inputSuffix, maxLength, toggleDisabled, }: SettingOptionProps) {
+  // Input 타입에서 label과 input을 연결하기 위한 id. 항목마다 고유해야 하므로
+  // settingName이 아닌 useId로 발급한다(같은 이름의 설정이 여러 페이지에 있어도 안전).
+  const inputId = useId();
+
   let typeNode: ReactNode;
   switch (type) {
     case SettingType.Button:
@@ -82,19 +114,35 @@ export function SettingOption({ settingName, description = "", type, buttonLabel
       typeNode = <ActionButton label={buttonLabel ?? settingName} onClick={onClick} danger disabled={buttonDisabled} />;
       break;
     case SettingType.Toggle:
-      typeNode = <Toggle value={value} onChange={onChange} disabled={toggleDisabled} />;
+      typeNode = <Toggle value={value} onChange={onChange} disabled={toggleDisabled} label={settingName} />;
       break;
     case SettingType.Input:
-      typeNode = <InputAction value={inputValue} onChange={onInputChange} placeholder={inputPlaceholder} suffix={inputSuffix} maxLength={maxLength} buttonLabel={buttonLabel} onClick={onClick} disabled={buttonDisabled} />;
+      typeNode = <InputAction id={inputId} value={inputValue} onChange={onInputChange} placeholder={inputPlaceholder} suffix={inputSuffix} maxLength={maxLength} buttonLabel={buttonLabel} onClick={onClick} disabled={buttonDisabled} />;
       break;
   }
+
+  // 이름/설명 블록에는 type이 Input일 때만 label 역할을 맡긴다. Button·Toggle은
+  // 버튼/토글 자체가 접근 가능한 이름(label 텍스트, aria-label)을 이미 갖고 있다.
+  const NameTag = type === SettingType.Input ? "label" : "span";
+  const nameProps = type === SettingType.Input ? { htmlFor: inputId } : {};
+
   return (
-    <div className="mt-5 grid-cols-[2fr_1fr] grid-rows-2 grid">
-      <span className="col-span-1 text-md font-semibold">{settingName}</span>
-      <div className="col-span-1 row-span-2 justify-end flex items-center">
+    // 설명 유무와 무관하게 정렬이 유지되도록 grid 대신 flex를 쓴다. 이름/설명은 한 덩어리로
+    // 묶여 위에서 아래로 쌓이고, 컨트롤은 세로 중앙 정렬로 나란히 붙는다. 좁은 화면에서는
+    // 긴 이름·서브도메인이 컨트롤과 겹치지 않도록 세로로 쌓는다.
+    // 바깥 여백은 갖지 않는다 — 목록 안 항목 간 간격은 부모(Section)가 관리한다.
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <NameTag {...nameProps} className="block text-sm font-semibold text-primary-text-color break-keep">
+          {settingName}
+        </NameTag>
+        {description && (
+          <p className="mt-1 text-xs leading-relaxed text-secondary-text-color break-keep">{description}</p>
+        )}
+      </div>
+      <div className="flex shrink-0 sm:justify-end">
         {typeNode}
       </div>
-      <span className="col-span-1 text-sm text-gray-300">{description}</span>
     </div>
   )
 }

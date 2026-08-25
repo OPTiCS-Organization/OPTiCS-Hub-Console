@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { AlertTriangle, Globe, Trash2 } from "lucide-react";
 import { Section } from "../components/ui/Section";
 import { SettingOption, SettingType } from "../components/ui/SettingOption";
 import { useWorkspace } from "../context/Workspace.context";
 import { useModal } from "../context/Modal.context";
 import { useAuth } from "../context/Auth.context";
 import type { Workspace } from "../context/Workspace.context";
+import { dangerNoticeClass } from "../constants/danger";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 
 const SUBDOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 const RESERVED_WORKSPACE_SUBDOMAINS = new Set(["api", "docs", "console", "admin", "tunnel", "proxy"]);
@@ -12,74 +15,54 @@ const RESERVED_WORKSPACE_SUBDOMAINS = new Set(["api", "docs", "console", "admin"
 function DeleteWorkspaceConfirmModal({ workspace, userDisplay }: { workspace: Workspace; userDisplay: string }) {
   const { deleteWorkspace } = useWorkspace();
   const { closeModal } = useModal();
-  const [confirmation, setConfirmation] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const expected = `${userDisplay}/${workspace.workspaceName}`;
-  const canDelete = confirmation === expected && !isDeleting;
-
-  async function handleDelete() {
-    if (!canDelete) return;
-    setIsDeleting(true);
-    setError(null);
-    try {
-      await deleteWorkspace(workspace.workspaceIndex, confirmation);
-      closeModal({ force: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "워크스페이스 삭제에 실패했습니다.");
-    } finally {
-      setIsDeleting(false);
-    }
-  }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-sm border border-danger-color/30 bg-danger-color/10 px-3 py-2.5">
-        <p className="text-sm font-semibold text-danger-color">이 작업은 되돌릴 수 없습니다.</p>
-        <p className="mt-1 text-xs leading-relaxed text-secondary-text-color">
-          워크스페이스와 연결 정보가 삭제되며, 활성화된 서브도메인의 DNS 레코드도 함께 삭제됩니다.
+    <ConfirmDialog
+      tone="danger"
+      target={{
+        name: workspace.workspaceName,
+        // 워크스페이스는 코드가 없어 카드가 한 줄로 비어 보인다. 함께 사라지는
+        // 서브도메인을 붙이면 카드가 채워지면서 삭제 범위도 같이 읽힌다.
+        detail: workspace.workspaceSubdomain ? `${workspace.workspaceSubdomain}.optics.run` : undefined,
+        icon: <Trash2 className="h-4 w-4" />,
+      }}
+      impacts={[
+        {
+          emphasis: true,
+          icon: <AlertTriangle className="h-3.5 w-3.5" />,
+          title: '워크스페이스와 연결 정보가 사라집니다',
+          detail: '되돌릴 수 없습니다.',
+        },
+        {
+          icon: <Globe className="h-3.5 w-3.5" />,
+          title: '활성화된 서브도메인의 DNS 레코드도 함께 삭제됩니다',
+        },
+      ]}
+      friction={{
+        kind: 'phrase',
+        phrase: expected,
+        label: '삭제하려면 다음 문구를 그대로 입력하세요.',
+      }}
+      confirmLabel="워크스페이스 삭제"
+      onCancel={() => closeModal()}
+      onConfirm={async () => {
+        setError(null);
+        try {
+          await deleteWorkspace(workspace.workspaceIndex, expected);
+          closeModal({ force: true });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "워크스페이스 삭제에 실패했습니다.");
+        }
+      }}
+    >
+      {error && (
+        <p role="alert" aria-live="polite" className="text-xs text-danger-color break-keep">
+          {error}
         </p>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-medium text-secondary-text-color">
-          삭제하려면 아래 문구를 그대로 입력하세요.
-        </label>
-        <div className="rounded-sm border border-border-color bg-background-color px-3 py-2 font-mono text-xs text-primary-text-color">
-          {expected}
-        </div>
-        <input
-          value={confirmation}
-          onChange={e => {
-            setConfirmation(e.target.value);
-            setError(null);
-          }}
-          placeholder={expected}
-          className="h-9 rounded-sm border border-border-color bg-modal-box-color px-3 text-sm text-primary-text-color outline-none transition-colors placeholder:text-secondary-text-color/40 focus:border-danger-color"
-        />
-      </div>
-
-      {error && <p className="text-xs text-danger-color">{error}</p>}
-
-      <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => closeModal()}
-          disabled={isDeleting}
-          className="h-8 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50 cursor-pointer"
-        >
-          취소
-        </button>
-        <button
-          type="button"
-          onClick={() => { void handleDelete(); }}
-          disabled={!canDelete}
-          className="h-8 rounded-sm bg-danger-color px-3 text-xs font-semibold text-white transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
-        >
-          {isDeleting ? "삭제 중" : "워크스페이스 삭제"}
-        </button>
-      </div>
-    </div>
+      )}
+    </ConfirmDialog>
   );
 }
 
@@ -154,14 +137,14 @@ export default function WorkspaceSettings() {
   function handleOpenDeleteModal() {
     if (!currentWorkspace || !user?.userDisplay) return;
     openModal(
-      "워크스페이스 삭제",
+      "워크스페이스 삭제 확인",
       <DeleteWorkspaceConfirmModal workspace={currentWorkspace} userDisplay={user.userDisplay} />,
     );
   }
 
   if (!currentWorkspace) {
     return (
-      <div className="text-primary-text-color mt-20">
+      <div className="text-primary-text-color mt-16 w-full max-w-4xl mx-auto">
         <h1 className="text-lg font-bold mb-1">Workspace Settings</h1>
         <p className="text-secondary-text-color text-sm">선택된 워크스페이스가 없습니다.</p>
       </div>
@@ -169,11 +152,22 @@ export default function WorkspaceSettings() {
   }
 
   return (
-    <div className="text-primary-text-color mt-20">
+    <div className="text-primary-text-color mt-16 w-full max-w-4xl mx-auto">
       <h1 className="text-lg font-bold mb-1">Workspace Settings</h1>
-      <p className="text-secondary-text-color text-sm">{currentWorkspace.workspaceName}</p>
+      <p className="text-secondary-text-color text-sm break-keep wrap-break-word">{currentWorkspace.workspaceName}</p>
 
-      <Section sectionName="Subdomain">
+      {/* 섹션 사이 간격은 페이지가 정한다. Section 이 자기 바깥 여백(mt-8)을 들고 있으면
+          페이지마다 다른 리듬을 주고 싶을 때 손댈 곳이 없어진다. */}
+      <div className="mt-8 flex flex-col gap-8">
+
+      <Section
+        sectionName="Subdomain"
+        notice={error && (
+          <p role="alert" className={`${dangerNoticeClass} text-xs text-danger-color break-keep`}>
+            {error}
+          </p>
+        )}
+      >
         <SettingOption
           settingName="서브도메인"
           description={inputDescription}
@@ -198,10 +192,23 @@ export default function WorkspaceSettings() {
           onChange={handleToggle}
           toggleDisabled={!canToggle || isToggling}
         />
-        {error && <p className="mt-3 text-xs text-red-400">{error}</p>}
       </Section>
 
-      <Section sectionName="Danger">
+      {/* 워크스페이스 삭제는 되돌릴 수 없는 작업이므로 나머지 설정과 같은 카드에 두지 않고
+          별도 Section으로 분리한다. tone="danger"로 테두리/헤더도 위험 톤으로 바꿔
+          시각적으로도 한 번 더 구분된다. */}
+      <Section
+        sectionName="Danger"
+        tone="danger"
+        notice={(
+          <div className={`flex items-start gap-2.5 ${dangerNoticeClass}`}>
+            <AlertTriangle className="h-4 w-4 shrink-0 text-danger-color mt-px" />
+            <span className="text-danger-color text-xs leading-relaxed break-keep">
+              아래 작업은 되돌릴 수 없습니다. 워크스페이스와 연결된 모든 설정이 영구히 삭제됩니다.
+            </span>
+          </div>
+        )}
+      >
         <SettingOption
           settingName="워크스페이스 삭제"
           description="워크스페이스와 연결된 설정을 삭제합니다."
@@ -211,6 +218,7 @@ export default function WorkspaceSettings() {
           buttonDisabled={!user?.userDisplay}
         />
       </Section>
+      </div>
     </div>
   );
 }

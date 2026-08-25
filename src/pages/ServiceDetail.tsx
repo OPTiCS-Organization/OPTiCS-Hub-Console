@@ -6,11 +6,13 @@ import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
 import { useWorkspace } from "../context/Workspace.context";
 import { useServiceLog } from "../hooks/useServiceLog";
+import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { statusDot, statusLabel, presetLabel } from "../constants/service";
 import type { ServiceEndpoint, ServiceItem } from "../interfaces/ServiceItem.interface";
 import ServiceForm from "../components/service/ServiceForm";
 import LogPanel from "../components/service/LogPanel";
 import Tooltip from "../components/ui/Tooltip";
+import { dangerNoticeClass } from "../constants/danger";
 
 type TabKey = 'overview' | 'containers' | 'logs';
 
@@ -236,7 +238,7 @@ function EndpointEditor({
         </button>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] gap-2 px-0.5 text-[10px] font-medium uppercase tracking-wider text-secondary-text-color">
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] gap-2 px-0.5 text-3xs font-medium uppercase tracking-wider text-secondary-text-color">
         <span>컴포넌트</span>
         <span>서브도메인</span>
         <span>외부 포트</span>
@@ -278,7 +280,7 @@ function EndpointEditor({
               onChange={e => updateEndpoint(index, 'containerPort', e.target.value)}
             />
             <Tooltip label="엔드포인트 제거">
-              <button type="button" onClick={() => removeEndpoint(index)} aria-label="엔드포인트 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+              <button type="button" onClick={() => removeEndpoint(index)} aria-label="엔드포인트 제거" className="text-secondary-text-color hover:text-danger-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-danger-color">
                 <X className="h-3.5 w-3.5" />
               </button>
             </Tooltip>
@@ -292,7 +294,7 @@ function EndpointEditor({
         </div>
       )}
 
-      {error && <p className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400">{error}</p>}
+      {error && <p className={`${dangerNoticeClass} text-xs text-danger-color`}>{error}</p>}
 
       <div className="flex justify-end gap-2 border-t border-border-color pt-3">
         <button
@@ -376,7 +378,7 @@ export default function ServiceDetail() {
 
   if (!service && serviceLoading) {
     return (
-      <div className="text-primary-text-color mt-20 flex flex-col items-center gap-3">
+      <div className="text-primary-text-color mt-16 flex flex-col items-center gap-3">
         <p className="text-secondary-text-color text-sm">서비스 정보를 불러오는 중...</p>
       </div>
     );
@@ -384,7 +386,7 @@ export default function ServiceDetail() {
 
   if (!service) {
     return (
-      <div className="text-primary-text-color mt-20 flex flex-col items-center gap-3">
+      <div className="text-primary-text-color mt-16 flex flex-col items-center gap-3">
         <p className="text-secondary-text-color text-sm">서비스 정보를 찾을 수 없습니다.</p>
         <Link to="/services" className="flex items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer">
           <ArrowLeft className="w-3 h-3" />
@@ -447,6 +449,72 @@ export default function ServiceDetail() {
     }
   }
 
+  // 삭제 범위를 고른 뒤 반드시 한 번 더 확인받는다. 예전에는 범위 버튼을 누르는
+  // 순간 바로 지워져서, 이 앱에서 가장 되돌릴 수 없는 동작에 마찰이 하나도 없었다.
+  function confirmDeleteScope(scope: 'containers' | 'service') {
+    if (!service) return;
+
+    if (scope === 'containers') {
+      openModal('컨테이너 삭제 확인', (
+        <ConfirmDialog
+          tone="danger"
+          target={{ name: service.serviceName, icon: <Trash2 className="h-4 w-4" /> }}
+          impacts={[
+            {
+              emphasis: true,
+              icon: <Square className="h-3.5 w-3.5" />,
+              title: '실행 중인 컨테이너가 즉시 중지되고 삭제됩니다',
+              detail: '이미지와 볼륨, Agent 로그 세션 마커도 함께 지워집니다.',
+            },
+            {
+              icon: <RefreshCw className="h-3.5 w-3.5" />,
+              title: 'Hub의 서비스 정보는 남습니다',
+              detail: '같은 설정으로 다시 배포할 수 있습니다.',
+            },
+          ]}
+          friction={{ kind: 'acknowledge', label: '컨테이너와 볼륨이 삭제되는 것을 확인했습니다.' }}
+          confirmLabel="컨테이너 삭제"
+          onCancel={() => closeModal()}
+          onConfirm={() => deleteService('containers')}
+        />
+      ));
+      return;
+    }
+
+    openModal('서비스 삭제 확인', (
+      <ConfirmDialog
+        tone="danger"
+        target={{ name: service.serviceName, icon: <Trash2 className="h-4 w-4" /> }}
+        impacts={[
+          {
+            emphasis: true,
+            icon: <Trash2 className="h-3.5 w-3.5" />,
+            title: '컨테이너·이미지·볼륨이 모두 삭제됩니다',
+            detail: '볼륨에 담긴 데이터는 복구할 수 없습니다.',
+          },
+          {
+            emphasis: true,
+            icon: <Package className="h-3.5 w-3.5" />,
+            title: 'Hub의 서비스 목록에서도 제거됩니다',
+            detail: '배포 설정, 포트 매핑, 엔드포인트, 환경 변수가 함께 사라집니다.',
+          },
+          {
+            icon: <Plus className="h-3.5 w-3.5" />,
+            title: '다시 쓰려면 서비스를 처음부터 등록해야 합니다',
+          },
+        ]}
+        friction={{
+          kind: 'phrase',
+          phrase: service.serviceName,
+          label: '삭제하려면 서비스 이름을 그대로 입력하세요.',
+        }}
+        confirmLabel="서비스 전체 삭제"
+        onCancel={() => closeModal()}
+        onConfirm={() => deleteService('service')}
+      />
+    ));
+  }
+
   function handleDeleteService() {
     if (!service) return;
     openModal('서비스 삭제', (
@@ -456,20 +524,22 @@ export default function ServiceDetail() {
         </p>
         <div className="space-y-2">
           <button
-            onClick={() => { void deleteService('containers'); }}
-            className="w-full text-left rounded-md border border-border-color px-3 py-2.5 hover:border-service-color transition-colors cursor-pointer"
+            type="button"
+            onClick={() => { confirmDeleteScope('containers'); }}
+            className="w-full text-left rounded-md border border-border-color px-3 py-2.5 hover:border-service-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
           >
             <span className="block text-xs font-semibold text-primary-text-color">컨테이너만 삭제</span>
-            <span className="block text-[10px] text-secondary-text-color mt-1">
+            <span className="block text-3xs text-secondary-text-color mt-1">
               Hub 서비스 정보는 유지하고 실행 컨테이너, 이미지, 볼륨, Agent 로그 세션 마커를 삭제합니다.
             </span>
           </button>
           <button
-            onClick={() => { void deleteService('service'); }}
-            className="w-full text-left rounded-md border border-red-500/40 px-3 py-2.5 hover:border-red-400 transition-colors cursor-pointer"
+            type="button"
+            onClick={() => { confirmDeleteScope('service'); }}
+            className="w-full text-left rounded-md border border-danger-color/40 px-3 py-2.5 transition-colors cursor-pointer hover:border-danger-color hover:bg-danger-color/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-color/50"
           >
-            <span className="block text-xs font-semibold text-red-400">서비스 전체 삭제</span>
-            <span className="block text-[10px] text-secondary-text-color mt-1">
+            <span className="block text-xs font-semibold text-danger-color">서비스 전체 삭제</span>
+            <span className="block text-3xs text-secondary-text-color mt-1">
               컨테이너와 Agent 로컬 데이터를 삭제하고 Hub 서비스 목록에서도 제거합니다.
             </span>
           </button>
@@ -528,7 +598,7 @@ export default function ServiceDetail() {
               <h1 className="text-lg font-bold truncate">{service.serviceName}</h1>
               <span className="text-secondary-text-color/60 text-xs shrink-0">{presetLabel[service.serviceDeployPreset]}</span>
             </div>
-            <span className={`text-xs ${service.serviceStatus === 'running' ? 'text-green-400' : service.serviceStatus === 'failed' ? 'text-red-400' : service.serviceStatus === 'starting' || service.serviceStatus === 'building' ? 'text-yellow-400' : 'text-secondary-text-color'}`}>
+            <span className={`text-xs ${service.serviceStatus === 'running' ? 'text-success-color' : service.serviceStatus === 'failed' ? 'text-danger-color' : service.serviceStatus === 'starting' || service.serviceStatus === 'building' ? 'text-warning-color' : 'text-secondary-text-color'}`}>
               {statusLabel[service.serviceStatus]}
               {containerCounts && containerCounts.total > 0 && (
                 <span className="text-secondary-text-color/60 ml-0.5">
@@ -546,7 +616,7 @@ export default function ServiceDetail() {
                 <button
                   type="button"
                   onClick={() => handleStartService()}
-                  className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                  className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
                   aria-label="서비스 시작"
                 >
                   <Play className="w-4 h-4" />
@@ -556,7 +626,7 @@ export default function ServiceDetail() {
                 <button
                   type="button"
                   onClick={() => handleStopService()}
-                  className="p-1 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer"
+                  className="p-1 rounded-sm text-secondary-text-color transition-colors cursor-pointer hover:bg-danger-color/10 hover:text-danger-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-color/50"
                   aria-label="서비스 중지"
                 >
                   <Square className="w-4 h-4" />
@@ -571,7 +641,7 @@ export default function ServiceDetail() {
                 if (!service || !currentWorkspace) return;
                 openModal('재배포', <ServiceForm mode="redeploy" workspaceIndex={currentWorkspace.workspaceIndex} service={service} onSuccess={() => { void fetchService(); }} />);
               }}
-              className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+              className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
               aria-label="재배포"
             >
               <RefreshCw className="w-4 h-4" />
@@ -581,7 +651,7 @@ export default function ServiceDetail() {
             <button
               type="button"
               onClick={() => handleDeleteService()}
-              className="p-1 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer"
+              className="p-1 rounded-sm text-secondary-text-color transition-colors cursor-pointer hover:bg-danger-color/10 hover:text-danger-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-color/50"
               aria-label="서비스 삭제"
             >
               <Trash2 className="w-4 h-4" />
@@ -646,7 +716,7 @@ export default function ServiceDetail() {
                     <button
                       type="button"
                       onClick={handleEditEndpoints}
-                      className="mt-0.5 p-0.5 shrink-0 text-secondary-text-color/60 transition-colors hover:text-primary-text-color cursor-pointer"
+                      className="mt-0.5 p-0.5 shrink-0 text-secondary-text-color/60 transition-colors hover:text-primary-text-color cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
                       aria-label={endpoints.length === 0 ? "엔드포인트 추가" : "엔드포인트 편집"}
                     >
                       {endpoints.length === 0 ? <Plus className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
@@ -659,15 +729,15 @@ export default function ServiceDetail() {
               <InfoRow label="컴포넌트">
                 <div className="flex flex-col gap-1">
                   {components.map(component => (
-                    <span key={component.componentIndex} className="flex items-center gap-1.5">
-                      <span className={`h-1.5 w-1.5 rounded-full ${
-                        component.status === 'running' ? 'bg-green-400'
-                        : component.status === 'building' || component.status === 'starting' || component.status === 'restarting' ? 'bg-yellow-400'
-                        : component.status === 'failed' ? 'bg-red-400'
+                    <span key={component.componentIndex} className="flex min-w-0 items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                        component.status === 'running' ? 'bg-success-color'
+                        : component.status === 'building' || component.status === 'starting' || component.status === 'restarting' ? 'bg-warning-color'
+                        : component.status === 'failed' ? 'bg-danger-color'
                         : 'bg-secondary-text-color/40'
                       }`} />
-                      <span className="font-mono">{component.componentName}</span>
-                      <span className="text-secondary-text-color/60">{component.status}</span>
+                      <span className="min-w-0 truncate font-mono">{component.componentName}</span>
+                      <span className="shrink-0 text-secondary-text-color/60">{component.status}</span>
                     </span>
                   ))}
                 </div>
@@ -682,9 +752,9 @@ export default function ServiceDetail() {
                 : (
                   <div className="flex flex-col gap-0.5">
                     {sourceRepositories.map((source, i) => (
-                      <div key={i} className="flex items-center gap-1.5 text-secondary-text-color/80">
+                      <div key={i} className="flex min-w-0 items-center gap-1.5 text-secondary-text-color/80">
                         <GitBranch className="w-3 h-3 shrink-0" />
-                        <span className="font-mono truncate">
+                        <span className="min-w-0 truncate font-mono">
                           {source.url}{source.rootDirectory ? ` / ${source.rootDirectory}` : ''}
                         </span>
                       </div>
@@ -705,33 +775,33 @@ export default function ServiceDetail() {
             ) : (
               <div className="flex flex-col gap-1">
                 {containers.map(c => (
-                  <div key={c.name} className="flex items-center gap-2 rounded-md border border-border-color/50 px-3 py-2 text-xs">
+                  <div key={c.name} className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-border-color/50 px-3 py-2 text-xs">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      c.status === 'running' ? 'bg-green-400'
-                      : c.status === 'starting' || c.status === 'building' ? 'bg-yellow-400 animate-pulse'
-                      : c.status === 'failed' ? 'bg-red-400'
+                      c.status === 'running' ? 'bg-success-color'
+                      : c.status === 'starting' || c.status === 'building' ? 'bg-warning-color animate-pulse'
+                      : c.status === 'failed' ? 'bg-danger-color'
                       : 'bg-secondary-text-color/40'
                     }`} />
-                    <span className="font-mono text-secondary-text-color/80">{c.name}</span>
+                    <span className="min-w-0 max-w-[220px] truncate font-mono text-secondary-text-color/80">{c.name}</span>
                     {c.service && c.service !== c.name && (
-                      <span className="text-secondary-text-color/40">{c.service}</span>
+                      <span className="min-w-0 max-w-[160px] truncate text-secondary-text-color/40">{c.service}</span>
                     )}
                     <span className={
-                      c.status === 'running' ? 'text-green-400'
-                      : c.status === 'starting' || c.status === 'building' ? 'text-yellow-400'
-                      : c.status === 'failed' ? 'text-red-400'
-                      : 'text-secondary-text-color/50'
+                      c.status === 'running' ? 'shrink-0 text-success-color'
+                      : c.status === 'starting' || c.status === 'building' ? 'shrink-0 text-warning-color'
+                      : c.status === 'failed' ? 'shrink-0 text-danger-color'
+                      : 'shrink-0 text-secondary-text-color/50'
                     }>{c.status}</span>
                     {c.health && (
-                      <span className="text-secondary-text-color/40">health: {c.health}</span>
+                      <span className="shrink-0 text-secondary-text-color/40">health: {c.health}</span>
                     )}
-                    <div className="ml-auto flex items-center gap-2">
+                    <div className="ml-auto flex shrink-0 items-center gap-2">
                       {!isRemoved && (c.status === 'stopped' || c.status === 'failed') && (
                         <Tooltip label="컨테이너 시작">
                           <button
                             type="button"
                             onClick={() => { void handleContainerAction(c.name, 'start'); }}
-                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
                             aria-label="컨테이너 시작"
                           >
                             <Play className="w-3 h-3" />
@@ -743,7 +813,7 @@ export default function ServiceDetail() {
                           <button
                             type="button"
                             onClick={() => { void handleContainerAction(c.name, 'stop'); }}
-                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
                             aria-label="컨테이너 중지"
                           >
                             <Square className="w-3 h-3" />
@@ -755,7 +825,7 @@ export default function ServiceDetail() {
                           <button
                             type="button"
                             onClick={() => { void handleContainerAction(c.name, 'restart'); }}
-                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+                            className="p-0.5 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
                             aria-label="컨테이너 재시작"
                           >
                             <RefreshCw className="w-3 h-3" />

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
-import { patchNotes, changeKindLabel, changeKindDotClass, changeKindOrder, betaBadgeClass } from "../constants/patchNotes";
+import { patchNotes, changeKindLabel, changeKindDotClass, changeKindOrder, badgeBaseClass, currentBadgeClass, importantBadgeClass, betaBadgeClass, partialFixBadgeClass, partialFixBadgeHint } from "../constants/patchNotes";
 import packageJson from "../../package.json";
 import { markPatchNotesSeen, useUnreadPatchNoteCount } from "../hooks/usePatchNoteBadge";
 
@@ -30,7 +30,7 @@ export default function PatchNotes() {
   }, [unreadAtMount]);
 
   return (
-    <div className="text-primary-text-color mt-20 max-w-3xl">
+    <div className="text-primary-text-color mt-16 w-full max-w-4xl mx-auto">
 
       <div className="mb-8">
         <h1 className="text-lg font-bold mb-1">Patch Notes</h1>
@@ -45,9 +45,18 @@ export default function PatchNotes() {
           const isNew = unreadAtMount > 0 && index < unreadAtMount;
 
           return (
-            <div key={note.version} className={`relative pl-6 pb-8 ${index === patchNotes.length - 1 ? "" : "border-l border-border-strong-color"}`}>
+            <div key={note.version} className="relative pl-6 pb-8">
+              {/* 선을 컨테이너의 border-l 로 그리면 항목 맨 위에서 시작해 점 위로 꼬리가
+                  삐져나오고, 버전 제목 왼쪽에 선이 나란히 붙어 보인다. 점 아래에서
+                  시작하도록 따로 그려야 다음 항목으로 이어지는 타임라인으로 읽힌다. */}
+              {index !== patchNotes.length - 1 && (
+                <span aria-hidden className="absolute top-5 bottom-0 left-0 w-px bg-border-strong-color" />
+              )}
+              {/* Tailwind preflight 가 box-sizing:border-box 를 걸어 두므로 w-2 는 테두리를
+                  포함한 8px 이다. 점 중심 = left + 4, 선(1px, x=0~1) 중심 = 0.5 이므로
+                  left 는 -3.5px 여야 한다. */}
               <span
-                className={`absolute -left-[4.5px] top-1.5 h-2 w-2 rounded-full border-2 border-background-color ${
+                className={`absolute -left-[3.5px] top-1.5 h-2 w-2 rounded-full border-2 border-background-color ${
                   isCurrent ? "bg-service-color" : "bg-border-strong-color"
                 }`}
               />
@@ -62,20 +71,22 @@ export default function PatchNotes() {
                     : "border-transparent bg-transparent"
                 }`}
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-primary-text-color font-semibold text-sm font-mono">{note.version}</span>
+                {/* 버전은 아래 컴포넌트 표와 같은 mono 로, 코드네임은 그 부제로 읽히게 둔다.
+                    italic 은 이 화면에서 여기에만 쓰이던 예외라 걷어냈다. */}
+                <div className="mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="font-mono text-sm font-semibold text-primary-text-color">{note.version}</span>
                   {note.codename && (
-                    <span className="text-primary-text-color/80 text-sm italic">{note.codename}</span>
+                    <span className="text-sm text-secondary-text-color">{note.codename}</span>
                   )}
                   {isCurrent && (
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-service-color">Current</span>
+                    <span className={`${badgeBaseClass} ${currentBadgeClass}`}>Current</span>
                   )}
                   {note.highlight && !isCurrent && (
-                    <span className="text-[10px] font-medium uppercase tracking-widest text-warning-color">Important</span>
+                    <span className={`${badgeBaseClass} ${importantBadgeClass}`}>Important</span>
                   )}
                 </div>
 
-                <span className="text-tertiary-text-color text-xs block mb-4">{formatDate(note.date)}</span>
+                <span className="mb-4 block text-xs text-tertiary-text-color">{formatDate(note.date)}</span>
 
                 {note.warning && (
                   <div className="mb-4 flex items-start gap-2.5 rounded-sm border border-warning-color/30 bg-warning-color/10 px-3 py-2.5">
@@ -113,7 +124,7 @@ export default function PatchNotes() {
                       <div key={kind}>
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <span className={`h-1.5 w-1.5 rounded-full ${changeKindDotClass[kind]}`} />
-                          <span className="text-[10px] font-semibold uppercase tracking-widest text-secondary-text-color">
+                          <span className="text-3xs font-semibold uppercase tracking-widest text-secondary-text-color">
                             {changeKindLabel[kind]}
                           </span>
                         </div>
@@ -130,8 +141,16 @@ export default function PatchNotes() {
                                 className="text-secondary-text-color text-sm leading-relaxed break-keep wrap-break-word text-pretty relative before:absolute before:-left-3 before:text-tertiary-text-color before:content-['·']"
                               >
                                 {change.beta && (
-                                  <span className={`mr-1.5 align-[0.1em] inline-block rounded-full px-1.5 py-0.5 text-[9px] font-semibold tracking-wider ${betaBadgeClass}`}>
+                                  <span className={`mr-1.5 align-[0.1em] ${badgeBaseClass} ${betaBadgeClass}`}>
                                     BETA
+                                  </span>
+                                )}
+                                {change.partialFix && (
+                                  <span
+                                    title={partialFixBadgeHint}
+                                    className={`mr-1.5 align-[0.1em] ${badgeBaseClass} ${partialFixBadgeClass}`}
+                                  >
+                                    PARTIAL FIX
                                   </span>
                                 )}
                                 {change.description}

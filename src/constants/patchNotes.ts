@@ -23,12 +23,44 @@ export interface PatchNoteEntry {
   warning?: string;
   /** 컴포넌트별 버전 변경 표. Hub 외 Agent/Installer 등도 함께 릴리스될 때만 채운다. */
   versions?: ComponentVersionChange[];
-  /** beta: 아직 실험적인 기능. 목록에서 BETA 배지가 붙는다. */
-  changes: { kind: ChangeKind; description: string; beta?: boolean }[];
+  /**
+   * beta: 아직 실험적인 기능. 목록에서 BETA 배지가 붙는다.
+   * partialFix: 증상은 눌렀지만 원인을 끝까지 못 짚었거나 재발 여지가 남은 항목.
+   *             "고쳤다"고 단정하면 사용자가 재발을 보고하지 않게 되므로 따로 표시한다.
+   */
+  changes: { kind: ChangeKind; description: string; beta?: boolean; partialFix?: boolean }[];
 }
 
-/** BETA 배지. 종류(kind) 배지와 구분되도록 테두리만 있는 형태로 둔다. */
-export const betaBadgeClass = "border border-warning-color/40 text-warning-color";
+/**
+ * 배지 공통 형태. 색만 변형별로 덧붙인다.
+ *
+ * 한 페이지에 CURRENT / IMPORTANT / BETA / PARTIAL FIX 네 종류가 함께 놓이는데,
+ * 예전에는 앞 둘이 맨 텍스트, 뒤 둘만 알약 모양이라 같은 위계로 읽히지 않았다.
+ * 형태를 하나로 묶고 위계는 채움 여부로만 가른다.
+ * - 릴리스 전체에 붙는 배지(CURRENT, IMPORTANT): 배경을 채워 먼저 눈에 걸리게 한다.
+ * - 개별 항목에 붙는 배지(BETA, PARTIAL FIX): 테두리만 둬서 본문을 덮지 않게 한다.
+ */
+export const badgeBaseClass =
+  "inline-block shrink-0 whitespace-nowrap rounded-full border px-1.5 py-0.5 " +
+  "text-4xs font-semibold uppercase leading-none tracking-wider";
+
+/** 지금 실행 중인 버전. */
+export const currentBadgeClass = "border-service-color/40 bg-service-color/10 text-service-color";
+
+/** 업그레이드 전 반드시 읽어야 하는 릴리스. */
+export const importantBadgeClass = "border-warning-color/40 bg-warning-color/10 text-warning-color";
+
+/** 아직 실험적인 기능. */
+export const betaBadgeClass = "border-warning-color/40 text-warning-color";
+
+/**
+ * 완전한 수정이 아닌 항목. BETA와 같은 테두리 형태를 쓰되 색으로 구분한다.
+ * "MONITORING" 은 지켜본다는 사실만 알릴 뿐 수정이 덜 됐다는 뜻이 안 읽혀서 쓰지 않는다.
+ */
+export const partialFixBadgeClass = "border-caution-color/40 text-caution-color";
+
+/** 배지가 좁아 다 담지 못하는 뜻을 툴팁으로 풀어 준다. */
+export const partialFixBadgeHint = "완전한 수정이 아닙니다. 재발 여부를 모니터링 중이며, 패치 이후에도 동일 증상이 재현될 수 있습니다.";
 
 export const changeKindLabel: Record<ChangeKind, string> = {
   added: "추가",
@@ -60,7 +92,7 @@ export const patchNotes: PatchNoteEntry[] = [
   {
     version: "0.6.0",
     codename: "Asterism",
-    date: "2026-08-24",
+    date: "2026-08-25",
     highlight: true,
     warning: "이 업데이트를 적용하려면 OPTiCS Agent 0.6.0 수동 업데이트가 필요합니다.",
     versions: [
@@ -70,7 +102,15 @@ export const patchNotes: PatchNoteEntry[] = [
     ],
     changes: [
       { kind: 'added', beta: true, description: "OPTiCS Console에서 OPTiCS Agent를 원격으로 업데이트하는 기능을 추가했습니다." },
-      { kind: 'fixed', description: "응답 본문이 수신 도중 중단되는 문제를 수정했습니다. (모니터링 필요)" },
+      { kind: 'added', description: "OPTiCS Console의 사이드바를 아이콘만 남기고 접을 수 있도록 개선했습니다. 접은 상태는 다음 접속에도 유지됩니다." },
+      { kind: 'added', description: "OPTiCS Console 사이드바 하단에 계정 메뉴를 추가해 프로필과 로그아웃에 바로 접근할 수 있도록 했습니다." },
+      { kind: 'changed', description: "OPTiCS Console 사이드바에서 현재 보고 있는 메뉴가 더 뚜렷하게 드러나도록 강조 방식을 개선했습니다." },
+      { kind: 'changed', description: "OPTiCS Console 사이드바의 메인 메뉴와 워크스페이스 메뉴 전환에 이동 방향이 드러나는 전환 효과를 적용했습니다." },
+      { kind: 'changed', description: "OPTiCS Console의 본문 여백을 화면 폭에 맞춰 재조정해 넓은 화면에서 내용이 한쪽으로 쏠려 보이던 점을 개선했습니다." },
+      { kind: 'changed', description: "OPTiCS Console에서 키보드로 이동할 때 현재 선택된 항목이 표시되도록 개선했습니다." },
+      { kind: 'changed', description: "OPTiCS Gateway의 라우팅 오류 피드백 페이지에서 더 상세한 정보를 제공하도록 개선했습니다." },
+      { kind: 'changed', description: "OPTiCS Agent 및 OPTiCS Gateway의 터널링 로직을 수정해 서비스 요청 지연시간을 소폭 단축했습니다." },
+      { kind: 'fixed', partialFix: true, description: "OPTiCS Agent에서 반환하는 응답이 매우 길 경우 응답 본문이 잘리던 문제를 수정했습니다." },
     ]
   },
   {

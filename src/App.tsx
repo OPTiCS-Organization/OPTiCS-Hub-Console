@@ -22,27 +22,32 @@ function AppLayout() {
   return (
     <div className="min-h-screen bg-background-color flex">
       <Navigation />
-      {/*
-        오른쪽 여백은 margin 이 아니라 padding 으로 준다.
-        margin 이면 스크롤 컨테이너가 거기서 끝나 스크롤바가 화면 끝에서 떨어져 붙는다.
-        pr-78 = 기존 mr-70(17.5rem) + p-8(2rem) 이라 콘텐츠 위치는 그대로다.
-      */}
-      <main className="ml-56 flex h-screen min-h-0 flex-1 flex-col overflow-y-auto p-8 pr-78">
-        <UnverifiedBanner />
-        <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/overview" element={<Overview />} />
-          <Route path="/agents" element={<Agents />} />
-          <Route path="/agents/:agentUuid" element={<AgentDetail />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/activity" element={<Activity />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/workspace-settings" element={<WorkspaceSettings />} />
-          <Route path="/services" element={<Services />} />
-          <Route path="/services/:serviceIndex" element={<ServiceDetail />} />
-          <Route path="/patch-notes" element={<PatchNotes />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Routes>
+      <main
+        className="flex h-screen min-h-0 flex-1 flex-col overflow-y-auto p-8 pr-[var(--content-gutter-right)] transition-[margin-left,padding-right] duration-200"
+        style={{ marginLeft: "var(--nav-width)" }}
+      >
+        {/*
+          오른쪽 여백(--content-gutter-right)이 사이드바 무게를 받아 준 위에서,
+          남은 자리 안에 본문을 가운데 정렬한다. 최대 폭을 두는 것은 넓은 화면에서
+          한 줄이 지나치게 길어지지 않게 하기 위한 것이다.
+        */}
+        <div className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col">
+          <UnverifiedBanner />
+          <Routes>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/overview" element={<Overview />} />
+            <Route path="/agents" element={<Agents />} />
+            <Route path="/agents/:agentUuid" element={<AgentDetail />} />
+            <Route path="/users" element={<Users />} />
+            <Route path="/activity" element={<Activity />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/workspace-settings" element={<WorkspaceSettings />} />
+            <Route path="/services" element={<Services />} />
+            <Route path="/services/:serviceIndex" element={<ServiceDetail />} />
+            <Route path="/patch-notes" element={<PatchNotes />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </div>
       </main>
     </div>
   )

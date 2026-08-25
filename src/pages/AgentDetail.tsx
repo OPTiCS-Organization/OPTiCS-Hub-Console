@@ -15,8 +15,10 @@ import AgentUpdateStatus from "../components/agent/AgentUpdateStatus";
 import AgentUpdatePanel, { type AgentUpgrade } from "../components/agent/AgentUpdatePanel";
 import MetricSparkline from "../components/agent/MetricSparkline";
 import AgentUpdateConfirm from "../components/agent/AgentUpdateConfirm";
+import AgentDisconnectConfirm from "../components/agent/AgentDisconnectConfirm";
 import SshTerminal from '../components/agent/SshTerminal';
 import TerminalAuthModal from '../components/agent/TerminalAuthModal';
+import { dangerIconButtonClass } from '../constants/danger';
 import { useAuth } from '../context/Auth.context';
 import { useModal } from '../context/Modal.context';
 import { useWorkspace } from '../context/Workspace.context';
@@ -115,7 +117,7 @@ function MetricCard({
             <span className="shrink-0 text-service-color">{icon}</span>
           </div>
           <p className="mt-0.5 truncate text-lg font-semibold text-primary-text-color">{value}</p>
-          <p className="truncate text-[11px] text-secondary-text-color">{detail}</p>
+          <p className="truncate text-2xs text-secondary-text-color">{detail}</p>
         </div>
       </div>
       <div className="mt-3 border-t border-border-color/40 pt-2">
@@ -140,7 +142,6 @@ export default function AgentDetail() {
   const [memHistory, setMemHistory] = useState<number[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [terminalToken, setTerminalToken] = useState<string | null>(null);
-  const [disconnecting, setDisconnecting] = useState(false);
 
   // silent: 소켓 이벤트로 인한 재조회. 페이지 전체를 스피너로 갈아치우면
   // 업데이트 진행 중 로그가 올 때마다 화면이 통째로 깜빡인다.
@@ -242,7 +243,7 @@ export default function AgentDetail() {
 
   function handleUpdate(release: AgentUpgrade) {
     if (!agent) return;
-    openModal('에이전트 업데이트', (
+    openModal('에이전트 업데이트 확인', (
       <AgentUpdateConfirm
         agentName={agent.agentName}
         currentVersion={agent.agentVersion}
@@ -265,51 +266,30 @@ export default function AgentDetail() {
     void loadAgent();
   }
 
+  // 전송 중 상태는 확인 모달이 직접 들고 있다. 여기서 들고 있어 봐야
+  // 모달이 열릴 때 만들어진 ReactNode에는 반영되지 않는다.
   async function disconnectAgent() {
     if (!agent || !currentWorkspace) return;
-    setDisconnecting(true);
-    try {
-      const res = await apiFetch(
-        `/v1/workspace/${currentWorkspace.workspaceIndex}/agent/${encodeURIComponent(agent.agentCode)}/disconnect`,
-        { method: 'DELETE' },
-        logout,
-      );
-      if (res.ok) {
-        closeModal({ force: true });
-        navigate('/agents');
-      }
-    } finally {
-      setDisconnecting(false);
+    const res = await apiFetch(
+      `/v1/workspace/${currentWorkspace.workspaceIndex}/agent/${encodeURIComponent(agent.agentCode)}/disconnect`,
+      { method: 'DELETE' },
+      logout,
+    );
+    if (res.ok) {
+      closeModal({ force: true });
+      navigate('/agents');
     }
   }
 
   function handleDisconnect() {
     if (!agent) return;
-    openModal('연결 해제', (
-      <div className="space-y-4">
-        <p className="text-xs text-secondary-text-color">
-          '{agent.agentName}' 연결을 해제하시겠습니까? 이 Agent를 통해 배포된 서비스는 계속 실행되지만, 이 워크스페이스에서 더 이상 제어할 수 없습니다.
-        </p>
-        <div className="flex justify-end gap-2 border-t border-border-color pt-3">
-          <button
-            type="button"
-            onClick={() => closeModal()}
-            disabled={disconnecting}
-            className="h-8 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color cursor-pointer disabled:opacity-50"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={() => { void disconnectAgent(); }}
-            disabled={disconnecting}
-            className="inline-flex h-8 items-center gap-2 rounded-sm bg-red-500/90 px-3.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {disconnecting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            연결 해제
-          </button>
-        </div>
-      </div>
+    openModal('에이전트 연결 해제 확인', (
+      <AgentDisconnectConfirm
+        agentName={agent.agentName}
+        agentCode={agent.agentCode}
+        onConfirm={disconnectAgent}
+        onCancel={() => closeModal()}
+      />
     ));
   }
 
@@ -323,7 +303,7 @@ export default function AgentDetail() {
 
   if (!currentWorkspace || !agent) {
     return (
-      <div className="mt-20 text-primary-text-color">
+      <div className="mt-16 text-primary-text-color">
         <Link to="/agents" className="flex items-center gap-1 text-sm text-secondary-text-color hover:text-primary-text-color">
           <ArrowLeft className="h-4 w-4" /> Agents
         </Link>
@@ -345,27 +325,32 @@ export default function AgentDetail() {
       {/* 뒤로가기 */}
       <Link
         to="/agents"
-        className="mb-4 flex w-fit shrink-0 items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+        className="mb-3 flex w-fit shrink-0 items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
       >
         <ArrowLeft className="w-3 h-3" />
         목록으로
       </Link>
 
-      {/* 헤더: 정체성 + 제어 */}
-      <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-4">
+      {/*
+        헤더: 정체성 + 제어.
+        아이콘(40px)과 두 줄짜리 텍스트의 높이를 맞춰야 세 덩어리가 한 줄로 읽힌다.
+        제목에 leading-tight(18px * 1.25 = 22.5px)를 주면 제목 + 간격 2px + 상태 16px
+        = 약 40px 이 되어 아이콘과 나란히 떨어진다. items-center 는 그 위에서만 의미가 있다.
+      */}
+      <div className="mb-5 flex shrink-0 items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-3">
           <div className="relative w-10 h-10 rounded-md bg-modal-box-color border border-border-color flex items-center justify-center shrink-0">
             <Cpu className="w-5 h-5 text-secondary-text-color" />
             <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border-2 border-background-color ${statusDot[agent.agentStatus]}`} />
           </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <h1 className="text-lg font-bold truncate">{agent.agentName}</h1>
-              <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${connectionBadge[agent.agentConnection]}`}>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-bold leading-tight truncate">{agent.agentName}</h1>
+              <span className={`inline-block px-2 py-0.5 rounded-full text-3xs font-medium leading-none shrink-0 ${connectionBadge[agent.agentConnection]}`}>
                 {connectionLabel[agent.agentConnection]}
               </span>
             </div>
-            <span className={`text-xs ${agent.agentStatus === 'online' ? 'text-green-400' : agent.agentStatus === 'failed' ? 'text-red-400' : agent.agentStatus === 'restarting' || agent.agentStatus === 'waiting' ? 'text-yellow-400' : 'text-secondary-text-color'}`}>
+            <span className={`text-xs leading-tight truncate ${agent.agentStatus === 'online' ? 'text-success-color' : agent.agentStatus === 'failed' ? 'text-danger-color' : agent.agentStatus === 'restarting' || agent.agentStatus === 'waiting' ? 'text-warning-color' : 'text-secondary-text-color'}`}>
               {statusLabel[agent.agentStatus]}
               {agent.agentStatus !== 'online' && (
                 <span className="text-secondary-text-color/60 ml-1">
@@ -376,12 +361,15 @@ export default function AgentDetail() {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-3">
+        {/* 아이콘 버튼은 p-1.5 로 28px 히트 영역을 만들고, 그 여백이 이미 간격 역할을 하므로
+            버튼 사이 gap 은 좁게 둔다. 마지막 버튼의 오른쪽 여백만큼 -mr 로 되돌려
+            아이콘의 시각적 오른쪽 끝을 아래 콘텐츠와 맞춘다. */}
+        <div className="-mr-1.5 flex shrink-0 items-center gap-0.5">
           <Tooltip label="새로고침" side="bottom">
             <button
               type="button"
               onClick={() => { void loadAgent(); }}
-              className="p-1 text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+              className="flex p-1.5 rounded-sm text-secondary-text-color hover:text-primary-text-color hover:bg-white/5 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-border-strong-color"
               aria-label="새로고침"
             >
               <RefreshCw className="w-4 h-4" />
@@ -392,7 +380,7 @@ export default function AgentDetail() {
               <button
                 type="button"
                 onClick={handleDisconnect}
-                className="p-1 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer"
+                className={dangerIconButtonClass}
                 aria-label="연결 해제"
               >
                 <Unlink className="w-4 h-4" />
@@ -461,7 +449,7 @@ export default function AgentDetail() {
               {agent.workspaceName ?? <span className="text-secondary-text-color/50">미연결</span>}
             </InfoRow>
             <InfoRow label="UUID">
-              <span className="font-mono text-secondary-text-color/80">{agent.agentUuid}</span>
+              <span className="break-all font-mono text-secondary-text-color/80">{agent.agentUuid}</span>
             </InfoRow>
             <InfoRow label="등록일">
               <span className="text-secondary-text-color/80">{new Date(agent.agentCreatedAt).toLocaleString()}</span>

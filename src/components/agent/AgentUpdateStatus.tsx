@@ -29,25 +29,25 @@ const PHASE: Record<Exclude<UpdatePhase, 'idle'>, {
   restarting: {
     label: '재시작 중',
     detail: 'Agent를 다시 시작하는 중입니다. 배포된 Service는 중단되지 않습니다. 이 단계에서는 Service에 다가가는 요청이 모두 거부됩니다.',
-    tone: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
+    tone: 'text-warning-color bg-warning-color/10 border-warning-color/20',
     spinning: true,
   },
   succeeded: {
     label: '업데이트 완료',
     detail: 'Agent가 새 버전으로 정상 시작했습니다.',
-    tone: 'text-green-400 bg-green-500/10 border-green-500/20',
+    tone: 'text-success-color bg-success-color/10 border-success-color/20',
     spinning: false,
   },
   rolled_back: {
     label: '되돌려짐',
     detail: 'Agent가 새 버전 시작에 실패하여 이전 버전으로 복구했습니다.',
-    tone: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+    tone: 'text-caution-color bg-caution-color/10 border-caution-color/20',
     spinning: false,
   },
   failed: {
     label: '업데이트 실패',
     detail: "Agent 호스트에서 'docker logs optics-agent-updater'로 원인을 확인하세요.",
-    tone: 'text-red-400 bg-red-500/10 border-red-500/20',
+    tone: 'text-danger-color bg-danger-color/10 border-danger-color/20',
     spinning: false,
   },
 };
@@ -70,19 +70,19 @@ export function AgentUpdateBadge({ agent, upgradeTo }: { agent: Agent; upgradeTo
     // 원격 업데이트가 안 되는 구버전은 버튼을 눌러도 막히므로, 배지에서부터 다르게 말한다.
     const manual = !agent.remoteUpdateSupported;
     return (
-      <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-[10px] ${manual
-        ? 'border-yellow-500/20 bg-yellow-500/5 text-yellow-400'
+      <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-3xs ${manual
+        ? 'border-warning-color/20 bg-warning-color/5 text-warning-color'
         : 'border-service-color/20 bg-service-color/5 text-service-color'}`}>
         <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
-        <span className="font-medium">{manual ? '수동 업데이트 필요' : '업데이트 가능'}</span>
-        <span className="font-mono opacity-70">{upgradeTo}</span>
+        <span className="shrink-0 font-medium">{manual ? '수동 업데이트 필요' : '업데이트 가능'}</span>
+        <span className="min-w-0 truncate font-mono opacity-70">{upgradeTo}</span>
       </div>
     );
   }
   const phase = PHASE[agent.updatePhase];
 
   return (
-    <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-[10px] ${phase.tone}`}>
+    <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-3xs ${phase.tone}`}>
       <PhaseIcon phase={agent.updatePhase} spinning={phase.spinning} />
       <span className="font-medium">{phase.label}</span>
       {agent.updateTarget && <span className="font-mono opacity-70">{agent.updateTarget}</span>}
@@ -104,11 +104,11 @@ export default function AgentUpdateStatus({
 
   return (
     <div className={`rounded-md border p-3 ${phase.tone}`}>
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <PhaseIcon phase={agent.updatePhase} spinning={phase.spinning} />
-        <span className="text-xs font-semibold">{phase.label}</span>
+        <span className="shrink-0 text-xs font-semibold">{phase.label}</span>
         {agent.updateTarget && (
-          <span className="text-[10px] font-mono opacity-70">
+          <span className="min-w-0 truncate text-3xs font-mono opacity-70">
             {agent.agentVersion ? `${agent.agentVersion} → ` : ''}{agent.updateTarget}
           </span>
         )}
@@ -116,15 +116,15 @@ export default function AgentUpdateStatus({
           <button
             type="button"
             onClick={onAcknowledge}
-            className="ml-auto text-[10px] px-2 py-0.5 rounded-sm bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+            className="ml-auto shrink-0 text-3xs px-2 py-0.5 rounded-sm bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
           >
             확인
           </button>
         )}
       </div>
-      <p className="text-[11px] mt-1.5 opacity-80">{phase.detail}</p>
+      <p className="text-2xs mt-1.5 opacity-80">{phase.detail}</p>
       {agent.updateMessage && (
-        <p className="text-[10px] font-mono mt-2 px-2 py-1.5 rounded-sm bg-black/20 opacity-70 break-all">
+        <p className="text-3xs font-mono mt-2 px-2 py-1.5 rounded-sm bg-black/20 opacity-70 break-all">
           {agent.updateMessage}
         </p>
       )}

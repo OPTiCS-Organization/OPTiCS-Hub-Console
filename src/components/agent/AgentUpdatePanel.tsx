@@ -35,15 +35,15 @@ export default function AgentUpdatePanel({
   // 0.6.0 미만에는 update-agent 리스너가 없다. 명령을 보내면 사라지므로 버튼 대신 안내를 준다.
   if (!agent.remoteUpdateSupported) {
     return (
-      <div className="rounded-md border border-yellow-500/25 bg-yellow-500/5 p-3">
-        <div className="flex items-center gap-2">
-          <ArrowUpCircle className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
-          <span className="text-xs font-semibold text-primary-text-color">수동 업데이트 필요</span>
-          <span className="text-[10px] font-mono text-secondary-text-color">
+      <div className="rounded-md border border-warning-color/25 bg-warning-color/5 p-3">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <ArrowUpCircle className="w-3.5 h-3.5 text-warning-color shrink-0" />
+          <span className="shrink-0 text-xs font-semibold text-primary-text-color">수동 업데이트 필요</span>
+          <span className="min-w-0 truncate text-3xs font-mono text-secondary-text-color">
             {agent.agentVersion ? `${agent.agentVersion} → ` : ''}{upgrade.version}
           </span>
         </div>
-        <p className="text-[11px] text-secondary-text-color mt-1.5">
+        <p className="text-2xs text-secondary-text-color mt-1.5">
           이 버전은 원격 업데이트를 지원하지 않습니다. Agent 호스트에서 설치 스크립트를 직접 실행하여 업데이트하세요.
           OPTiCS Agent 0.6.0 이후 버전부터는 이 화면에서 업데이트할 수 있습니다.
         </p>
@@ -53,30 +53,35 @@ export default function AgentUpdatePanel({
 
   return (
     <div className="rounded-md border border-service-color/25 bg-service-color/5 p-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <ArrowUpCircle className="w-3.5 h-3.5 text-service-color shrink-0" />
-        <span className="text-xs font-semibold text-primary-text-color">업데이트 가능</span>
-        <span className="text-[10px] font-mono text-secondary-text-color">
+        <span className="shrink-0 text-xs font-semibold text-primary-text-color">업데이트 가능</span>
+        <span className="min-w-0 truncate text-3xs font-mono text-secondary-text-color">
           {agent.agentVersion ? `${agent.agentVersion} → ` : ''}{upgrade.version}
         </span>
         <button
           type="button"
           onClick={() => onUpdate(upgrade)}
           disabled={agent.agentStatus !== 'online'}
-          className="ml-auto h-7 rounded-sm bg-service-color px-3 text-[11px] font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+          className="ml-auto inline-flex h-7 shrink-0 items-center gap-1.5 rounded-sm bg-service-color pl-3 pr-2 text-2xs font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
         >
           업데이트
+          {/* 채운 주황 위라 패치노트의 테두리형 BETA 배지는 읽히지 않는다.
+              같은 흰 잉크를 옅게 깔아 버튼의 일부로 보이게 둔다. */}
+          <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-4xs font-semibold leading-none tracking-wider">
+            BETA
+          </span>
         </button>
       </div>
 
       {agent.agentStatus !== 'online' && (
-        <p className="text-[10px] text-secondary-text-color mt-1.5">
+        <p className="text-3xs text-secondary-text-color mt-1.5">
           에이전트가 온라인일 때만 업데이트할 수 있습니다.
         </p>
       )}
 
       {upgrade.notes && (
-        <div className="mt-2.5 max-h-40 overflow-y-auto border-t border-service-color/15 pt-2.5 text-secondary-text-color">
+        <div className="mt-2.5 max-h-72 overflow-y-auto border-t border-service-color/15 pt-2.5 text-secondary-text-color">
           <ReleaseNotes source={upgrade.notes} />
         </div>
       )}

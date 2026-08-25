@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Loader2, RefreshCw, Plus } from "lucide-react";
+import { Loader2, RefreshCw, Plus, Server, PackageSearch } from "lucide-react";
 import { io, Socket } from "socket.io-client";
 import { useNavigate } from "react-router-dom";
 
@@ -100,7 +100,7 @@ export default function Services() {
   }
 
   return (
-    <div className="text-primary-text-color mt-20">
+    <div className="text-primary-text-color mt-16">
       <h1 className="text-lg font-bold mb-1">Services</h1>
       <p className="text-secondary-text-color text-sm mb-6">
         현재 워크스페이스에 연결된 에이전트의 서비스 목록입니다.
@@ -133,21 +133,42 @@ export default function Services() {
       </div>
 
       {!currentWorkspace ? (
-        <p className="text-secondary-text-color text-sm py-8 text-center">워크스페이스를 먼저 선택해주세요.</p>
+        <div className="flex flex-col items-center gap-2 py-14 text-center">
+          <Server className="w-6 h-6 text-secondary-text-color/40" />
+          <p className="text-secondary-text-color text-sm">워크스페이스를 먼저 선택해주세요.</p>
+        </div>
       ) : loading && services.length === 0 ? (
-        <div className="flex items-center gap-2 text-secondary-text-color text-sm py-8 justify-center">
+        <div className="flex items-center gap-2 text-secondary-text-color text-sm py-14 justify-center">
           <Loader2 className="w-4 h-4 animate-spin" />
           불러오는 중...
         </div>
       ) : services.length === 0 ? (
-        <p className="text-secondary-text-color text-sm py-8 text-center">등록된 서비스가 없습니다.</p>
+        <div className="flex flex-col items-center gap-3 py-14 text-center">
+          <PackageSearch className="w-6 h-6 text-secondary-text-color/40" />
+          <p className="text-secondary-text-color text-sm">등록된 서비스가 없습니다.</p>
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-sm bg-service-color text-white hover:opacity-80 transition-opacity cursor-pointer"
+          >
+            <Plus className="w-3 h-3" />
+            서비스 등록
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {services.map(service => (
             <div
               key={service.serviceIndex}
+              role="button"
+              tabIndex={0}
               onClick={() => navigate(`/services/${service.serviceIndex}`, { state: { service } })}
-              className="h-full cursor-pointer rounded-md border border-border-color hover:border-service-color transition-colors duration-100"
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate(`/services/${service.serviceIndex}`, { state: { service } });
+                }
+              }}
+              className="h-full cursor-pointer rounded-md border border-border-color transition-colors duration-100 hover:border-service-color focus-visible:outline-none focus-visible:border-service-color"
             >
               <ServiceCard service={service} containerCounts={containerCounts.get(service.serviceIndex)} />
             </div>

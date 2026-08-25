@@ -7,6 +7,11 @@ interface TooltipProps {
   children: ReactNode;
   label: string;
   side?: Side;
+  /**
+   * 트리거가 열어 놓은 UI(드롭다운·메뉴 등)를 툴팁이 가리는 동안 잠시 끄는 용도.
+   * 켜져 있는 동안에는 호버해도 뜨지 않는다.
+   */
+  disabled?: boolean;
 }
 
 /** 트리거와 툴팁 사이 간격(px). */
@@ -21,7 +26,7 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-export default function Tooltip({ children, label, side = 'top' }: TooltipProps) {
+export default function Tooltip({ children, label, side = 'top', disabled = false }: TooltipProps) {
   const [show, setShow] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
@@ -117,19 +122,23 @@ export default function Tooltip({ children, label, side = 'top' }: TooltipProps)
       onMouseLeave={() => setShow(false)}
       onFocus={() => setShow(true)}
       onBlur={() => setShow(false)}
+      // 클릭은 곧 '이름표는 이미 읽었다'는 뜻이다. 게다가 트리거가 클릭으로 자리를
+      // 옮기거나(접기 토글) 아래에 메뉴를 여는 경우, 툴팁만 남으면 유령처럼 보인다.
+      // 포인터가 나갔다 다시 들어오면 그때 정상적으로 다시 뜬다.
+      onClick={() => setShow(false)}
     >
       {children}
       {/* body 로 포탈한다. 조상에 overflow-hidden/auto 나 스택 컨텍스트가 있으면
           absolute 툴팁이 잘리거나 가려지는데, 툴팁은 트리거 박스보다 큰 것이 정상이라
           그 경계 안에 가둘 이유가 없다. */}
-      {show && createPortal(
+      {show && !disabled && createPortal(
         <div
           ref={tooltipRef}
           role="tooltip"
           // 측정 전에는 숨겨 둔다. 레이아웃 이펙트가 페인트 전에 위치를 잡으므로
           // 사용자에게는 어긋난 위치가 한 프레임도 보이지 않는다.
           style={{ visibility: 'hidden', left: 0, top: 0 }}
-          className="optics-tooltip-in fixed z-[60] px-2.5 py-1.5 rounded-sm bg-modal-box-color border border-border-color text-[11px] text-primary-text-color whitespace-nowrap shadow-[0_10px_24px_rgba(0,0,0,0.18)] pointer-events-none"
+          className="optics-tooltip-in fixed z-[60] px-2.5 py-1.5 rounded-sm bg-modal-box-color border border-border-color text-2xs text-primary-text-color whitespace-nowrap shadow-[0_10px_24px_rgba(0,0,0,0.18)] pointer-events-none"
         >
           {label}
           <div

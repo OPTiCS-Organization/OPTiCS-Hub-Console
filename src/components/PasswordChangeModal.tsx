@@ -5,6 +5,7 @@ import { apiFetch } from "../lib/apiFetch";
 import { passwordRules } from "../constants/validation";
 import Field from "./ui/Field";
 import Checklist from "./ui/Checklist";
+import { dangerNoticeClass } from "../constants/danger";
 
 type PasswordChangeModalProps = {
   onChanged: () => void;
@@ -109,7 +110,7 @@ export default function PasswordChangeModal({ onChanged }: PasswordChangeModalPr
       )}
 
       {error && (
-        <div className="rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-1.5 text-xs text-red-400">
+        <div role="alert" aria-live="polite" className={`${dangerNoticeClass} text-xs text-danger-color`}>
           {error}
         </div>
       )}
@@ -119,14 +120,14 @@ export default function PasswordChangeModal({ onChanged }: PasswordChangeModalPr
           type="button"
           onClick={() => closeModal()}
           disabled={isSubmitting}
-          className="cursor-pointer rounded-sm border border-border-color px-3.5 py-1.5 text-sm text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50"
+          className="cursor-pointer rounded-sm border border-border-color px-3.5 py-1.5 text-sm text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
         >
           취소
         </button>
         <button
           type="submit"
           disabled={!canSubmit || isSubmitting}
-          className="flex cursor-pointer items-center gap-2 rounded-sm bg-service-color px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex cursor-pointer items-center gap-2 rounded-sm bg-service-color px-3.5 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50 focus-visible:ring-offset-2 focus-visible:ring-offset-modal-background-color"
         >
           {isSubmitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           비밀번호 변경

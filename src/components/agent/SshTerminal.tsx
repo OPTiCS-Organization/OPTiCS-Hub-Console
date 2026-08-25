@@ -106,16 +106,16 @@ export default function SshTerminal({ socket, token, onClose }: SshTerminalProps
 
   return (
     <section className="overflow-hidden rounded-md border border-border-color bg-[#151210]">
-      <div className="flex items-center justify-between border-b border-border-color bg-modal-box-color px-3 py-2">
-        <div className="flex items-center gap-2">
-          <span className={`h-2 w-2 rounded-full ${status === '연결됨' ? 'bg-success-color' : 'bg-warning-color'}`} />
-          <span className="text-xs text-secondary-text-color">{status}</span>
+      <div className="flex items-center justify-between gap-2 border-b border-border-color bg-modal-box-color px-3 py-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${status === '연결됨' ? 'bg-success-color' : 'bg-warning-color'}`} />
+          <span className="truncate text-xs text-secondary-text-color">{status}</span>
         </div>
         <Tooltip label="터미널 닫기">
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-sm p-1 text-secondary-text-color hover:bg-white/5 hover:text-primary-text-color"
+            className="shrink-0 cursor-pointer rounded-sm p-1 text-secondary-text-color hover:bg-white/5 hover:text-primary-text-color"
             aria-label="터미널 닫기"
           >
             <X className="h-4 w-4" />

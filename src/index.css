@@ -1,5 +1,22 @@
 @import "tailwindcss";
 
+/*
+  사이드 내비게이션의 실제 폭. 접기(collapse) 토글에 따라 Navigation.tsx 가
+  런타임에 값을 바꾼다. App.tsx 의 본문 좌측 여백이 이 값을 그대로 따라가
+  두 컴포넌트가 상태를 주고받지 않고도 폭이 맞물린다.
+*/
+:root {
+  --nav-width: 14rem;
+
+  /*
+    본문 오른쪽 여백. 왼쪽은 사이드바라는 큰 덩어리가 차지하는데 오른쪽이 기본
+    패딩뿐이면 화면이 한쪽으로 쏠려 보인다. 사이드바 폭에 비례시켜 두면
+    접었다 폈다 할 때도 좌우 무게가 같은 비율로 따라온다.
+    비율만 만지면 균형이 조정된다.
+  */
+  --content-gutter-right: calc(var(--nav-width) * 0.6);
+}
+
 @theme {
   /* 브랜드 / 액센트 */
   --color-service-color: #fd7a28;
@@ -20,6 +37,10 @@
   /* 카드 / 서피스 */
   --color-modal-box-color: #2b2826;
   /* elevated (카드 위 카드) */
+  --color-surface-hover-color: #302c2a;
+  /* 인터랙티브 요소 hover 배경 (white/7.5 하드코딩 대체) */
+  --color-surface-active-color: #3a3532;
+  /* 인터랙티브 요소 active/선택 배경 (white/10 하드코딩 대체) */
 
   /* 보더 / 그림자 */
   --color-border-color: #393431;
@@ -36,36 +57,36 @@
   --color-success-color: #6db98f;
   --color-warning-color: #e8c468;
   --color-danger-color: #e0726a;
+  --color-caution-color: #d9915f;
+  /* 되돌림처럼 실패는 아니나 주의가 필요한 상태 */
 }
 
-@keyframes optics-panel-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes optics-row-in {
-  from {
-    opacity: 0;
-    transform: translateX(-4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+/*
+  Tailwind 기본 스케일은 xs(12px/16px)에서 멈춘다. 그 아래 크기를 text-[10px] 처럼
+  임의값으로 쓰면 font-size 만 잡히고 line-height 는 조상에서 상속된다.
+  그래서 같은 배지라도 어디에 놓이느냐에 따라 높이가 달라지고, 버튼 안에서는
+  글자와 배지의 중심이 어긋났다. xs 에서 -1px / -2px 씩 내려가는 사다리로 정의해
+  크기를 쓰면 행높이가 따라오게 한다.
+*/
+@theme {
+  --text-2xs: 0.6875rem;
+  /* 11px */
+  --text-2xs--line-height: 1rem;
+  /* 16px */
+  --text-3xs: 0.625rem;
+  /* 10px */
+  --text-3xs--line-height: 0.875rem;
+  /* 14px */
+  --text-4xs: 0.5625rem;
+  /* 9px */
+  --text-4xs--line-height: 0.75rem;
+  /* 12px */
 }
 
 @keyframes optics-tooltip-in {
   from {
     opacity: 0;
-    transform: scale(0.96);
+    transform: scale(0.97);
   }
 
   to {
@@ -84,25 +105,17 @@
   }
 }
 
-.optics-panel-in {
-  animation: optics-panel-in 180ms ease-out both;
-}
-
-.optics-row-in {
-  animation: optics-row-in 160ms ease-out both;
-}
-
 .optics-step-active {
   animation: optics-soft-pulse 1400ms ease-in-out infinite;
 }
 
 .optics-tooltip-in {
-  animation: optics-tooltip-in 150ms ease-out both;
+  /* ease-out 은 초반이 급해 툴팁이 '툭' 튀어나온다.
+     감속이 완만한 곡선으로 바꾸고 시간을 늘려 스르르 떠오르게 한다. */
+  animation: optics-tooltip-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .optics-panel-in,
-  .optics-row-in,
   .optics-step-active,
   .optics-tooltip-in {
     animation: none;

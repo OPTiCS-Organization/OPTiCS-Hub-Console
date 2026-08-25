@@ -67,13 +67,13 @@ function renderLogLine(entry: LogEntry, muted = false) {
       {tags.length > 0 && (
         <span className="flex gap-1 shrink-0 self-start">
           {tags.map(tag => (
-            <span key={tag} className="inline-flex h-4 items-center px-1 rounded border border-border-color text-secondary-text-color/60 text-[9px] leading-none">
+            <span key={tag} className="inline-flex h-4 items-center px-1 rounded border border-border-color text-secondary-text-color/60 text-4xs leading-none">
               {tag}
             </span>
           ))}
         </span>
       )}
-      <span className={isError ? 'text-red-400' : 'text-primary-text-color'}>{entry.log}</span>
+      <span className={isError ? 'text-danger-color' : 'text-primary-text-color'}>{entry.log}</span>
     </>
   );
 }
@@ -88,7 +88,7 @@ const LogRow = memo(function LogRow({ entry, muted = false }: { entry: LogEntry;
           {formatTimestamp(entry.timestamp)}
         </span>
         <span className="h-px bg-border-color flex-1" />
-        <span className="text-secondary-text-color/70 text-[10px] shrink-0">{markerLabel(entry)}</span>
+        <span className="text-secondary-text-color/70 text-3xs shrink-0">{markerLabel(entry)}</span>
         <span className="h-px bg-border-color flex-1" />
       </div>
     );
@@ -224,30 +224,35 @@ function LogPanel({
           <Terminal className="w-3.5 h-3.5 text-secondary-text-color" />
           <span className="text-xs font-semibold text-primary-text-color">로그</span>
           <span className="w-1.5 h-1.5 rounded-full bg-service-color animate-pulse" />
-          <span className="text-[10px] text-secondary-text-color/60">
+          <span className="text-3xs text-secondary-text-color/60">
             {isMeasuring ? '크기 측정 중...' : isLoadingHistory ? `불러오는 중 ${logLoadProgress.percent}%` : 'Streaming'}
           </span>
         </div>
         <button
           onClick={onClear}
-          className="text-[10px] text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer"
+          className="text-3xs text-secondary-text-color hover:text-primary-text-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-primary-text-color"
         >
           지우기
         </button>
       </div>
-      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-5">
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto overflow-x-auto p-3 font-mono text-2xs leading-5">
         {isLoadingOlderLogs && (
-          <div className="text-center text-secondary-text-color/50 text-[10px] py-1">
+          <div className="text-center text-secondary-text-color/50 text-3xs py-1">
             이전 로그 불러오는 중...
           </div>
         )}
         {!hasOlderLogs && logs.length > 0 && (
-          <div className="text-center text-secondary-text-color/30 text-[10px] py-1">
+          <div className="text-center text-secondary-text-color/30 text-3xs py-1">
             더 이상 불러올 로그가 없습니다
           </div>
         )}
         {logs.length === 0
-          ? (!loadingLabel && <span className="text-[11px] text-secondary-text-color/40">로그 대기 중...</span>)
+          ? (!loadingLabel && (
+            <div className="flex h-full min-h-[220px] flex-col items-center justify-center gap-2 text-secondary-text-color/40">
+              <Terminal className="w-5 h-5" />
+              <span className="text-2xs">로그 대기 중...</span>
+            </div>
+          ))
           : sessionGroups.map(([sid, sessionLogs]) => {
             const isCurrent = sid === currentSessionId;
             const isExpanded = expandedSessions.has(sid);
@@ -261,7 +266,7 @@ function LogPanel({
                       next.has(sid) ? next.delete(sid) : next.add(sid);
                       return next;
                     })}
-                    className="text-secondary-text-color/40 hover:text-secondary-text-color transition-colors cursor-pointer text-[10px] py-0.5"
+                    className="text-secondary-text-color/40 hover:text-secondary-text-color transition-colors cursor-pointer text-3xs py-0.5"
                   >
                     {isExpanded ? '▾' : '▸'} 이전 세션 로그 {sessionLogs.length}줄
                   </button>
@@ -286,7 +291,7 @@ function LogPanel({
                       // 토스트가 이미 '추가 표시' 상태로 떠 있으면 누적, 아니면 새로 시작
                       setToast(prev => prev?.mode === 'shown' ? { mode: 'shown', added: prev.added + added } : { mode: 'shown', added });
                     }}
-                    className="text-secondary-text-color/40 hover:text-secondary-text-color transition-colors cursor-pointer text-[10px] py-0.5"
+                    className="text-secondary-text-color/40 hover:text-secondary-text-color transition-colors cursor-pointer text-3xs py-0.5"
                   >
                     ▴ 이전 줄 {hiddenCount.toLocaleString()}줄 더보기
                   </button>
@@ -304,7 +309,7 @@ function LogPanel({
       {/* 우측 하단: 로딩 진행 표시와 "표시된 로그 수" 안내를 각각 독립적으로 쌓아서 동시에 보일 수 있게 한다 */}
       <div className="pointer-events-none absolute bottom-3 right-3 flex flex-col items-end gap-2">
         {toast && (
-          <div className="flex items-center gap-2 rounded-md border border-border-color bg-modal-background-color/90 px-2.5 py-1.5 text-[10px] text-secondary-text-color shadow-md backdrop-blur-sm transition-opacity duration-300">
+          <div className="flex items-center gap-2 rounded-md border border-border-color bg-modal-background-color/90 px-2.5 py-1.5 text-3xs text-secondary-text-color shadow-md backdrop-blur-sm transition-opacity duration-300">
             <Check className="w-3 h-3 shrink-0 text-service-color" />
             <span>
               {toast.mode === 'loaded'
@@ -314,7 +319,7 @@ function LogPanel({
           </div>
         )}
         {loadingLabel && (
-          <div className="flex items-center gap-2 rounded-md border border-border-color bg-modal-background-color/90 px-2.5 py-1.5 text-[10px] text-secondary-text-color shadow-md backdrop-blur-sm transition-opacity duration-300">
+          <div className="flex items-center gap-2 rounded-md border border-border-color bg-modal-background-color/90 px-2.5 py-1.5 text-3xs text-secondary-text-color shadow-md backdrop-blur-sm transition-opacity duration-300">
             <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
             <span>{loadingLabel}</span>
             {isLoadingHistory && (

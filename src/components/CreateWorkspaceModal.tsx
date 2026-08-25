@@ -4,6 +4,7 @@ import { useModal } from "../context/Modal.context";
 import { useAuth } from "../context/Auth.context";
 import { apiFetch } from "../lib/apiFetch";
 import { Loader2 } from "lucide-react";
+import { dangerNoticeClass } from "../constants/danger";
 
 const NAME_REGEX = /^[a-zA-Z0-9\-_]+$/;
 const SUBDOMAIN_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
@@ -110,8 +111,8 @@ export default function CreateWorkspaceModal() {
   }
 
   const nameInputBorder =
-    nameStatus === "valid" ? "border-green-500 focus:border-green-500" :
-    nameStatus === "invalid" ? "border-red-500 focus:border-red-500" :
+    nameStatus === "valid" ? "border-success-color focus:border-success-color" :
+    nameStatus === "invalid" ? "border-danger-color focus:border-danger-color" :
     "border-border-color focus:border-service-color";
 
   return (
@@ -130,12 +131,12 @@ export default function CreateWorkspaceModal() {
           className={`w-full rounded-sm bg-modal-box-color border px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none transition-colors duration-100 ${nameInputBorder}`}
         />
         <div className="flex items-center justify-between">
-          <span className={`text-[10px] ${nameStatus === "valid" ? "text-green-400" : nameStatus === "invalid" ? "text-red-400" : "text-secondary-text-color/0"}`}>
+          <span className={`text-3xs ${nameStatus === "valid" ? "text-success-color" : nameStatus === "invalid" ? "text-danger-color" : "text-secondary-text-color/0"}`}>
             {nameStatus === "checking"
               ? <span className="flex items-center gap-1 text-secondary-text-color"><Loader2 className="w-2.5 h-2.5 animate-spin inline" /> Checking...</span>
               : nameMessage ?? "　"}
           </span>
-          <span className="text-[10px] text-secondary-text-color">{name.length} / 50</span>
+          <span className="text-3xs text-secondary-text-color">{name.length} / 50</span>
         </div>
       </div>
 
@@ -149,11 +150,11 @@ export default function CreateWorkspaceModal() {
           onChange={e => setSubdomain(e.target.value)}
           placeholder="Ex. my-team"
           maxLength={63}
-          className={`w-full rounded-sm bg-modal-box-color border px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none transition-colors duration-100 ${subdomainError ? "border-red-500 focus:border-red-500" : "border-border-color focus:border-service-color"}`}
+          className={`w-full rounded-sm bg-modal-box-color border px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none transition-colors duration-100 ${subdomainError ? "border-danger-color focus:border-danger-color" : "border-border-color focus:border-service-color"}`}
         />
         <div className="flex items-center justify-between">
-          <span className="text-[10px] text-red-400">{subdomainError ?? "　"}</span>
-          <span className="text-[10px] text-secondary-text-color">{subdomain.length} / 63</span>
+          <span className="text-3xs text-danger-color">{subdomainError ?? "　"}</span>
+          <span className="text-3xs text-secondary-text-color">{subdomain.length} / 63</span>
         </div>
       </div>
 
@@ -169,13 +170,13 @@ export default function CreateWorkspaceModal() {
           rows={3}
           className="w-full rounded-sm bg-modal-box-color border border-border-color px-3 py-2 text-sm text-primary-text-color placeholder:text-secondary-text-color/50 outline-none focus:border-service-color transition-colors duration-100 resize-none"
         />
-        <span className="text-[10px] text-secondary-text-color text-right">{description.length} / 200</span>
+        <span className="text-3xs text-secondary-text-color text-right">{description.length} / 200</span>
       </div>
 
       {/* Error */}
       {error && (
-        <div className="rounded-sm bg-red-500/10 border border-red-500/30 px-3 py-2">
-          <span className="text-xs text-red-400">{error}</span>
+        <div className={dangerNoticeClass}>
+          <span className="text-xs text-danger-color">{error}</span>
         </div>
       )}
 

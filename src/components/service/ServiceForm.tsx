@@ -7,6 +7,7 @@ import { useAgents } from "../../hooks/useAgents";
 import Tooltip from "../ui/Tooltip";
 import type { EnvEntry } from "../../interfaces/EnvEntry.interface";
 import type { ServiceItem } from "../../interfaces/ServiceItem.interface";
+import { dangerIconButtonClass, dangerNoticeClass } from "../../constants/danger";
 
 interface ServiceFormProps {
   mode: 'create' | 'redeploy';
@@ -65,7 +66,8 @@ const stepMeta: Record<CreateStep, { title: string; description: string }> = {
 
 const compactInputCls = "h-9 w-full rounded-sm border border-border-color bg-background-color px-2.5 text-xs text-primary-text-color placeholder:text-secondary-text-color/40 outline-none transition-colors duration-100 focus:border-service-color";
 const compactValidInputCls = "border-success-color/60 bg-success-color/5";
-const compactLabelCls = "text-[10px] font-medium uppercase tracking-wider text-secondary-text-color";
+const compactInvalidInputCls = "border-danger-color/60 bg-danger-color/5";
+const compactLabelCls = "text-3xs font-medium uppercase tracking-wider text-secondary-text-color";
 
 function FormSection({ title, description, action, modified, compact, children }: { title: string; description?: string; action?: React.ReactNode; modified?: boolean; compact?: boolean; children?: React.ReactNode }) {
   const hasBody = children !== null && children !== undefined && children !== false;
@@ -77,12 +79,12 @@ function FormSection({ title, description, action, modified, compact, children }
           <div className="flex min-w-0 items-center gap-2">
             <h3 className="text-xs font-semibold text-primary-text-color">{title}</h3>
             {modified && (
-              <span className="shrink-0 rounded-sm border border-service-color/25 bg-service-color/10 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-service-color">
+              <span className="shrink-0 rounded-sm border border-service-color/25 bg-service-color/10 px-1.5 py-0.5 text-4xs font-medium uppercase leading-none tracking-wider text-service-color">
                 Modified
               </span>
             )}
           </div>
-          {description && <p className="mt-0.5 text-[11px] leading-relaxed text-secondary-text-color">{description}</p>}
+          {description && <p className="mt-0.5 text-2xs leading-relaxed text-secondary-text-color">{description}</p>}
         </div>
         {action}
       </div>
@@ -660,15 +662,15 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         >
           <div className="flex max-h-52 flex-col gap-2 overflow-y-auto pr-1">
             {sourceRepositories.map((repo, i) => (
-              <div key={i} className={`optics-row-in rounded-sm border border-border-color/70 bg-background-color/55 ${isCreateMode ? 'p-2.5' : 'p-2'}`}>
+              <div key={i} className={`rounded-sm border border-border-color/70 bg-background-color/55 ${isCreateMode ? 'p-2.5' : 'p-2'}`}>
                 <div className={`${isCreateMode ? 'mb-1.5' : 'mb-1'} flex items-center justify-between gap-2`}>
                   <div className="flex min-w-0 items-center gap-1.5">
                     <GitBranch className="h-3.5 w-3.5 shrink-0 text-tertiary-text-color" />
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-tertiary-text-color">Repository {i + 1}</span>
+                    <span className="text-3xs font-medium uppercase tracking-wider text-tertiary-text-color">Repository {i + 1}</span>
                   </div>
                   {sourceRepositories.length > 1 && (
                     <Tooltip label="저장소 제거">
-                      <button type="button" onClick={() => removeSourceRepository(i)} className="p-0.5 text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer" aria-label="저장소 제거">
+                      <button type="button" onClick={() => removeSourceRepository(i)} className={dangerIconButtonClass} aria-label="저장소 제거">
                         <X className="w-3.5 h-3.5" />
                       </button>
                     </Tooltip>
@@ -677,14 +679,22 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                   <div className="relative min-w-0">
                     <input
-                      className={`${compactInputCls} pr-8 ${repo.url.trim() && isValidGithubRepoUrl(repo.url) ? compactValidInputCls : ''}`}
+                      className={`${compactInputCls} pr-8 ${
+                        repo.url.trim() && isValidGithubRepoUrl(repo.url) ? compactValidInputCls
+                        : repo.url.trim() && !isValidGithubRepoUrl(repo.url) ? compactInvalidInputCls
+                        : ''
+                      }`}
                       placeholder="https://github.com/owner/repo"
                       value={repo.url}
                       onChange={e => updateSourceRepository(i, 'url', e.target.value)}
                       required={i === 0}
+                      aria-invalid={repo.url.trim() !== '' && !isValidGithubRepoUrl(repo.url)}
                     />
                     {repo.url.trim() && isValidGithubRepoUrl(repo.url) && (
                       <Check className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-success-color" />
+                    )}
+                    {repo.url.trim() && !isValidGithubRepoUrl(repo.url) && (
+                      <AlertCircle className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-danger-color" />
                     )}
                   </div>
                   <input
@@ -728,7 +738,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                     </div>
                     <div className="min-w-0 flex-1">
                       <span className="block truncate text-xs font-medium">{agent.agentName}</span>
-                      <span className="mt-0.5 block text-[10px] text-tertiary-text-color">Agent #{agent.agentIndex}</span>
+                      <span className="mt-0.5 block text-3xs text-tertiary-text-color">Agent #{agent.agentIndex}</span>
                     </div>
                     {selected && <Check className="h-3.5 w-3.5 shrink-0 text-service-color" />}
                   </button>
@@ -757,7 +767,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           </div>
           <div className="flex max-h-36 flex-col gap-1.5 overflow-y-auto pr-1">
             {portMappings.map((mapping, index) => (
-              <div key={index} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
+              <div key={index} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
                 <input
                   className={compactInputCls}
                   placeholder="외부 포트"
@@ -779,7 +789,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                   required
                 />
                 <Tooltip label="포트 매핑 제거">
-                  <button type="button" onClick={() => removePortMapping(index)} aria-label="포트 매핑 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                  <button type="button" onClick={() => removePortMapping(index)} aria-label="포트 매핑 제거" className="text-secondary-text-color hover:text-danger-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-danger-color">
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </Tooltip>
@@ -816,7 +826,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
               </div>
               <div className="flex max-h-44 flex-col gap-1.5 overflow-y-auto pr-1">
                 {endpointEntries.map((endpoint, index) => (
-                  <div key={index} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] items-center gap-2">
+                  <div key={index} className="grid grid-cols-[minmax(0,1fr)_minmax(0,0.8fr)_minmax(0,0.7fr)_minmax(0,0.7fr)_18px] items-center gap-2">
                     <input
                       className={compactInputCls}
                       placeholder={defaultEndpointComponentName() || 'app'}
@@ -848,7 +858,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                       onChange={e => updateEndpoint(index, 'containerPort', e.target.value)}
                     />
                     <Tooltip label="엔드포인트 제거">
-                      <button type="button" onClick={() => removeEndpoint(index)} aria-label="엔드포인트 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                      <button type="button" onClick={() => removeEndpoint(index)} aria-label="엔드포인트 제거" className="text-secondary-text-color hover:text-danger-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-danger-color">
                         <X className="h-3.5 w-3.5" />
                       </button>
                     </Tooltip>
@@ -917,14 +927,17 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           <span />
         </div>
         <div className="flex max-h-56 flex-col gap-1.5 overflow-y-auto pr-1">
-          {envEntries.map((entry, i) => (
-            <div key={i} className="optics-row-in grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
+          {envEntries.map((entry, i) => {
+            const isDuplicateKey = entry.key.trim() !== '' && duplicateEnvKeys.includes(entry.key.trim());
+            return (
+            <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_18px] items-center gap-2">
               <input
-                className={compactInputCls}
+                className={`${compactInputCls} ${isDuplicateKey ? compactInvalidInputCls : ''}`}
                 placeholder="KEY"
                 value={entry.key}
                 onChange={e => updateEnvEntry(i, 'key', e.target.value)}
                 onPaste={e => handleEnvPaste(e, i)}
+                aria-invalid={isDuplicateKey}
               />
               <input
                 className={compactInputCls}
@@ -934,12 +947,13 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                 onPaste={e => handleEnvPaste(e, i)}
               />
               <Tooltip label="환경 변수 제거">
-                <button type="button" onClick={() => removeEnvEntry(i)} aria-label="환경 변수 제거" className="text-secondary-text-color hover:text-red-400 transition-colors cursor-pointer">
+                <button type="button" onClick={() => removeEnvEntry(i)} aria-label="환경 변수 제거" className="text-secondary-text-color hover:text-danger-color transition-colors cursor-pointer focus-visible:outline-none focus-visible:text-danger-color">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </Tooltip>
             </div>
-          ))}
+            );
+          })}
         </div>
           </>
         )}
@@ -959,7 +973,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           <SummaryRow label="소스" value={
             <div className="flex flex-col gap-1">
               {repositories.map(repo => (
-                <span key={`${repo.url}:${repo.rootDirectory}`} className="truncate font-mono text-[11px] text-secondary-text-color">
+                <span key={`${repo.url}:${repo.rootDirectory}`} className="truncate font-mono text-2xs text-secondary-text-color">
                   {repo.url}{repo.rootDirectory ? ` / ${repo.rootDirectory}` : ''}
                 </span>
               ))}
@@ -1020,9 +1034,9 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         <div className="border-b border-border-color/70 pb-2.5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="text-[10px] font-medium uppercase tracking-widest text-tertiary-text-color">Step {currentStepIndex + 1} / {createSteps.length}</div>
-              <p className="mt-0.5 text-[13px] font-semibold text-primary-text-color">{stepMeta[currentStep].title}</p>
-              <p className="mt-0.5 text-[10px] leading-relaxed text-secondary-text-color">{stepMeta[currentStep].description}</p>
+              <div className="text-3xs font-medium uppercase tracking-widest text-tertiary-text-color">Step {currentStepIndex + 1} / {createSteps.length}</div>
+              <p className="mt-0.5 text-[13px]/[1.125rem] font-semibold text-primary-text-color">{stepMeta[currentStep].title}</p>
+              <p className="mt-0.5 text-3xs leading-relaxed text-secondary-text-color">{stepMeta[currentStep].description}</p>
             </div>
 
             <div className="relative mt-1.5 w-[104px] shrink-0 px-1">
@@ -1041,9 +1055,11 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
                         type="button"
                         onClick={() => goToStep(step.key)}
                         aria-label={step.label}
-                        className="group flex min-w-0 justify-center cursor-pointer"
+                        aria-current={isCurrent ? 'step' : undefined}
+                        className="group flex min-w-0 justify-center cursor-pointer focus-visible:outline-none"
                       >
-                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border bg-modal-background-color transition-colors ${
+                        {/* 진행 중인 스텝만 은은한 펄스로 강조해 현재 위치를 한눈에 알 수 있게 한다 */}
+                        <span className={`flex h-3.5 w-3.5 items-center justify-center rounded-full border bg-modal-background-color transition-colors ${isCurrent ? 'optics-step-active' : ''} ${
                           isCurrent
                             ? 'border-service-color text-service-color'
                             : isDone
@@ -1066,27 +1082,27 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
         <div className="rounded-sm border border-border-color bg-modal-box-color/45 px-3 py-2.5">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <span className="block text-[10px] font-medium uppercase leading-3 tracking-widest text-tertiary-text-color">Redeploy</span>
+              <span className="block text-3xs font-medium uppercase leading-3 tracking-widest text-tertiary-text-color">Redeploy</span>
               <p className="mt-1 truncate text-sm font-semibold leading-4 text-primary-text-color">{form.serviceName || service?.serviceName || '서비스 재배포'}</p>
-              <p className="mt-1 text-[11px] leading-3 text-secondary-text-color">
+              <p className="mt-1 text-2xs leading-3 text-secondary-text-color">
                 {modifiedCount > 0 ? `${modifiedLabels.join(', ')} 변경 후 재배포합니다.` : '변경 사항 없이 다시 빌드 후 배포합니다.'}
               </p>
             </div>
-            <div className="flex h-6 shrink-0 items-center rounded-sm border border-border-color bg-background-color px-2 text-[10px] font-medium leading-none text-secondary-text-color">
+            <div className="flex h-6 shrink-0 items-center rounded-sm border border-border-color bg-background-color px-2 text-3xs font-medium leading-none text-secondary-text-color">
               {modifiedCount > 0 ? `변경 ${modifiedCount}개` : '변경 없음'}
             </div>
           </div>
         </div>
       )}
 
-      <div key={isCreateMode ? currentStep : 'redeploy'} className={`optics-panel-in ${isCreateMode ? 'min-h-[248px]' : 'max-h-[58vh] overflow-y-auto pr-1'}`}>
+      <div key={isCreateMode ? currentStep : 'redeploy'} className={`${isCreateMode ? 'min-h-[248px]' : 'max-h-[58vh] overflow-y-auto pr-1'}`}>
         {isCreateMode ? renderCreateStep() : renderRedeployFields()}
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 rounded-sm border border-red-500/30 bg-red-500/10 px-3 py-2">
-          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-400" />
-          <span className="text-xs text-red-400">{error}</span>
+        <div className={`${dangerNoticeClass} flex items-start gap-2`}>
+          <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-danger-color" />
+          <span className="text-xs text-danger-color">{error}</span>
         </div>
       )}
 
@@ -1095,7 +1111,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           type="button"
           onClick={isCreateMode && currentStepIndex > 0 ? goBack : () => closeModal()}
           disabled={loading}
-          className="flex h-8 items-center gap-1.5 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color hover:border-border-color/80 hover:bg-white/5 hover:text-primary-text-color transition-colors duration-100 cursor-pointer disabled:opacity-50"
+          className="flex h-8 items-center gap-1.5 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color hover:border-border-color/80 hover:bg-white/5 hover:text-primary-text-color transition-colors duration-100 cursor-pointer disabled:opacity-50 focus-visible:outline-none focus-visible:border-border-strong-color"
         >
           {isCreateMode && currentStepIndex > 0 && <ChevronLeft className="h-3.5 w-3.5" />}
           {isCreateMode && currentStepIndex > 0 ? '이전' : 'Cancel'}
@@ -1106,12 +1122,12 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
             type="button"
             onClick={() => { void handleDeploy(); }}
             disabled={loading || agents.length === 0}
-            className="flex h-8 items-center gap-2 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white hover:opacity-80 transition-opacity duration-100 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-8 items-center gap-2 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white hover:opacity-80 transition-opacity duration-100 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/40"
           >
             {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
             {submitLabel}
             {!isCreateMode && (
-              <span className="rounded-sm bg-white/15 px-1.5 py-0.5 text-[10px] font-medium">
+              <span className="rounded-sm bg-white/15 px-1.5 py-0.5 text-3xs font-medium leading-none">
                 {modifiedCount > 0 ? `변경 ${modifiedCount}개` : '동일'}
               </span>
             )}
@@ -1120,7 +1136,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
           <button
             type="button"
             onClick={goNext}
-            className="flex h-8 items-center gap-1.5 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white hover:opacity-80 transition-opacity duration-100 cursor-pointer"
+            className="flex h-8 items-center gap-1.5 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white hover:opacity-80 transition-opacity duration-100 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/40"
           >
             다음
             <ChevronRight className="h-3.5 w-3.5" />

@@ -7,7 +7,7 @@ interface Rule {
 
 export default function Checklist({ rules, value }: { rules: Rule[]; value: string }) {
   return (
-    <ul className="flex flex-col gap-1 -mt-2">
+    <ul className="flex flex-col gap-1 -mt-2" aria-live="polite">
       {rules.map(rule => {
         const passed = rule.test(value);
         return (

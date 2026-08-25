@@ -244,7 +244,7 @@ export default function Auth() {
   // ── 렌더 ──────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background-color flex items-center justify-center">
+    <div className="min-h-screen bg-background-color flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
 
         {/* Logo */}
@@ -254,6 +254,11 @@ export default function Auth() {
         </div>
 
         <div className="rounded-md border border-border-color bg-modal-background-color px-6 py-6">
+          {/* 단계마다 내용 높이에 맞춘다. 예전엔 가장 긴 단계(비밀번호 설정)에 min-height 를
+              맞춰 전환 시 흔들림을 없앴는데, 그러면 가장 짧고 가장 많이 보는 첫 화면이
+              절반쯤 빈 카드가 된다. 단계 전환은 사용자가 직접 누른 결과라 높이가 변하는
+              편이 자연스럽다. */}
+          <div key={step} className="flex flex-col">
 
           {/* Email Step */}
           {step === "email" && (
@@ -323,17 +328,17 @@ export default function Auth() {
               </div>
 
               <div className="rounded-sm border border-border-color bg-modal-box-color px-3 py-2.5">
-                <p className="text-tertiary-text-color text-[11px] leading-relaxed">
+                <p className="text-tertiary-text-color text-2xs leading-relaxed">
                   메일이 오지 않으면 스팸함을 확인해 주세요. 링크는 요청 시각 기준 10분간 유효합니다.
                 </p>
               </div>
 
-              {notice && <p className="text-service-color text-xs">{notice}</p>}
+              {notice && <p role="status" aria-live="polite" className="text-service-color text-xs">{notice}</p>}
               {apiError && <ErrorMessage>{apiError}</ErrorMessage>}
 
               <button
                 type="button" onClick={handleResend} disabled={cooldown > 0 || loading}
-                className="w-full rounded-sm border border-border-color hover:border-border-strong-color hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed text-secondary-text-color hover:text-primary-text-color text-xs font-medium py-2 transition-colors duration-100 cursor-pointer flex items-center justify-center gap-2"
+                className="w-full rounded-sm border border-border-color hover:border-border-strong-color hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed text-secondary-text-color hover:text-primary-text-color text-xs font-medium py-2 transition-colors duration-100 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
               >
                 {loading && <Loader2 className="w-3 h-3 animate-spin" />}
                 {cooldown > 0 ? `${cooldown}초 후 재발송 가능` : "인증 메일 다시 보내기"}
@@ -341,7 +346,7 @@ export default function Auth() {
 
               <button
                 type="button" onClick={() => { setEmail(""); resetTo("email"); }}
-                className="text-service-color text-xs hover:underline cursor-pointer"
+                className="text-service-color text-xs hover:underline cursor-pointer rounded-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-service-color/50"
               >
                 다른 이메일로 시작하기
               </button>
@@ -438,7 +443,7 @@ export default function Auth() {
                   <span className="font-mono text-primary-text-color text-xs break-all">{email}</span>
                 </div>
 
-                <p className="text-tertiary-text-color text-[11px] leading-relaxed break-keep">
+                <p className="text-tertiary-text-color text-2xs leading-relaxed break-keep">
                   {isAuthenticated
                     ? "이제 OPTiCS의 모든 기능을 제한 없이 사용하실 수 있습니다."
                     : "이제 로그인하시면 모든 기능을 제한 없이 사용하실 수 있습니다."}
@@ -459,6 +464,7 @@ export default function Auth() {
             </div>
           )}
 
+          </div>
         </div>
       </div>
     </div>
