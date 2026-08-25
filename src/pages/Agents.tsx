@@ -18,9 +18,10 @@ export default function Agents() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
 
-  const fetchAgents = useCallback(async () => {
+  // silent: 소켓 이벤트로 인한 재조회. 목록 전체를 로딩 상태로 되돌리지 않는다.
+  const fetchAgents = useCallback(async (options?: { silent?: boolean }) => {
     if (!currentWorkspace) return;
-    setAgentsLoading(true);
+    if (!options?.silent) setAgentsLoading(true);
     try {
       const res = await apiFetch(`/v1/agent/workspace/${currentWorkspace.workspaceIndex}`, {}, logout);
       const body = await res.json() as { data: { agents: Agent[] } };
@@ -28,7 +29,7 @@ export default function Agents() {
     } catch {
       // ignore
     } finally {
-      setAgentsLoading(false);
+      if (!options?.silent) setAgentsLoading(false);
     }
   }, [logout, currentWorkspace]);
 
@@ -46,9 +47,9 @@ export default function Agents() {
     socket.on('connect', () => {
       socket.emit('subscribe-workspace', { workspaceIndex: currentWorkspace.workspaceIndex });
     });
-    socket.on('agent-updated', () => fetchAgents());
+    socket.on('agent-updated', () => void fetchAgents({ silent: true }));
     // 업데이트 단계 전이는 별도 이벤트로 온다. 진행 중에도 카드가 실시간으로 따라가야 한다.
-    socket.on('agent-update', () => fetchAgents());
+    socket.on('agent-update', () => void fetchAgents({ silent: true }));
     return () => { socket.disconnect(); };
   }, [currentWorkspace, fetchAgents]);
 
@@ -158,7 +159,7 @@ export default function Agents() {
             )}
           </h2>
           <button
-            onClick={fetchAgents}
+            onClick={() => void fetchAgents()}
             disabled={agentsLoading}
             className="flex items-center gap-1.5 text-xs text-secondary-text-color hover:text-primary-text-color transition-colors disabled:opacity-40 cursor-pointer"
           >

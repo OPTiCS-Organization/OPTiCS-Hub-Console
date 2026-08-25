@@ -221,7 +221,7 @@ export default function Navigation() {
             }`
           }
         >
-          v{packageJson.version} <span className="font-light">Dev</span>
+          {packageJson.version} <span className="font-light">Dev</span>
         </NavLink>
       </div>
 

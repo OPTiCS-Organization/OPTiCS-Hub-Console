@@ -612,7 +612,7 @@ export default function ServiceDetail() {
 
         {activeTab === 'overview' && (
           <div className="overflow-y-auto pr-1">
-            <InfoRow label="버전">v{service.serviceVersion}</InfoRow>
+            <InfoRow label="버전">{service.serviceVersion}</InfoRow>
             <InfoRow label="포트">
               <div className="flex flex-col gap-1 font-mono">
                 {portMappings.map(mapping => (

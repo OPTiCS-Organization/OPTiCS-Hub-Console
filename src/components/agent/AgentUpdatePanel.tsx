@@ -1,5 +1,6 @@
 import { ArrowUpCircle, CheckCircle2 } from "lucide-react";
 import type { Agent } from "./AgentCard";
+import ReleaseNotes from "./ReleaseNotes";
 
 /**
  * 업데이트 가능 여부와 패치노트를 보여주는 패널.
@@ -31,13 +32,32 @@ export default function AgentUpdatePanel({
     );
   }
 
+  // 0.6.0 미만에는 update-agent 리스너가 없다. 명령을 보내면 사라지므로 버튼 대신 안내를 준다.
+  if (!agent.remoteUpdateSupported) {
+    return (
+      <div className="rounded-md border border-yellow-500/25 bg-yellow-500/5 p-3">
+        <div className="flex items-center gap-2">
+          <ArrowUpCircle className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+          <span className="text-xs font-semibold text-primary-text-color">수동 업데이트 필요</span>
+          <span className="text-[10px] font-mono text-secondary-text-color">
+            {agent.agentVersion ? `${agent.agentVersion} → ` : ''}{upgrade.version}
+          </span>
+        </div>
+        <p className="text-[11px] text-secondary-text-color mt-1.5">
+          이 버전은 원격 업데이트를 지원하지 않습니다. Agent 호스트에서 설치 스크립트를 직접 실행하여 업데이트하세요.
+          OPTiCS Agent 0.6.0 이후 버전부터는 이 화면에서 업데이트할 수 있습니다.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-md border border-service-color/25 bg-service-color/5 p-3">
       <div className="flex items-center gap-2">
         <ArrowUpCircle className="w-3.5 h-3.5 text-service-color shrink-0" />
         <span className="text-xs font-semibold text-primary-text-color">업데이트 가능</span>
         <span className="text-[10px] font-mono text-secondary-text-color">
-          {agent.agentVersion ? `v${agent.agentVersion} → ` : ''}v{upgrade.version}
+          {agent.agentVersion ? `${agent.agentVersion} → ` : ''}{upgrade.version}
         </span>
         <button
           type="button"
@@ -56,9 +76,9 @@ export default function AgentUpdatePanel({
       )}
 
       {upgrade.notes && (
-        <pre className="text-[10px] text-secondary-text-color mt-2.5 max-h-40 overflow-y-auto whitespace-pre-wrap break-words border-t border-service-color/15 pt-2.5 font-sans">
-          {upgrade.notes}
-        </pre>
+        <div className="mt-2.5 max-h-40 overflow-y-auto border-t border-service-color/15 pt-2.5 text-secondary-text-color">
+          <ReleaseNotes source={upgrade.notes} />
+        </div>
       )}
     </div>
   );

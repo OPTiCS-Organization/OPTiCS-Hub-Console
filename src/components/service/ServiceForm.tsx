@@ -986,7 +986,7 @@ export default function ServiceForm({ mode, workspaceIndex, onSuccess, service }
               </div>
             )
           } />
-          <SummaryRow label="버전" value={`v${form.serviceVersion.trim()}`} />
+          <SummaryRow label="버전" value={form.serviceVersion.trim()} />
           <SummaryRow label="에이전트" value={selectedAgent?.agentName ?? <span className="text-secondary-text-color">미선택</span>} />
           <SummaryRow label="환경 변수" value={`${envWithKeys.length}개`} />
         </div>

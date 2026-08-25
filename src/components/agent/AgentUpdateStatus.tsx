@@ -16,37 +16,37 @@ const PHASE: Record<Exclude<UpdatePhase, 'idle'>, {
 }> = {
   requested: {
     label: '업데이트 요청됨',
-    detail: '에이전트가 업데이트 작업을 준비하고 있습니다.',
+    detail: 'Agent가 업데이트 작업을 준비하고 있습니다.',
     tone: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
     spinning: true,
   },
   pulling: {
     label: '이미지 내려받는 중',
-    detail: '교체할 버전의 에이전트 이미지를 내려받는 중 입니다. 이 단계에서는 중단되지 않습니다.',
+    detail: '교체할 버전의 Agent 이미지를 내려받는 중입니다.',
     tone: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
     spinning: true,
   },
   restarting: {
     label: '재시작 중',
-    detail: '에이전트가 교체되는 동안 10초 간 연결이 끊깁니다. 배포된 서비스는 중단되지 않습니다..',
+    detail: 'Agent를 다시 시작하는 중입니다. 배포된 Service는 중단되지 않습니다. 이 단계에서는 Service에 다가가는 요청이 모두 거부됩니다.',
     tone: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
     spinning: true,
   },
   succeeded: {
     label: '업데이트 완료',
-    detail: '새 버전으로 정상 기동했습니다.',
+    detail: 'Agent가 새 버전으로 정상 시작했습니다.',
     tone: 'text-green-400 bg-green-500/10 border-green-500/20',
     spinning: false,
   },
   rolled_back: {
     label: '되돌려짐',
-    detail: '새 버전이 기동에 실패해 이전 버전으로 복구했습니다.',
+    detail: 'Agent가 새 버전 시작에 실패하여 이전 버전으로 복구했습니다.',
     tone: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
     spinning: false,
   },
   failed: {
     label: '업데이트 실패',
-    detail: "에이전트 호스트에서 'docker logs optics-agent-updater'로 원인을 확인하세요.",
+    detail: "Agent 호스트에서 'docker logs optics-agent-updater'로 원인을 확인하세요.",
     tone: 'text-red-400 bg-red-500/10 border-red-500/20',
     spinning: false,
   },
@@ -67,11 +67,15 @@ function PhaseIcon({ phase, spinning }: { phase: Exclude<UpdatePhase, 'idle'>; s
 export function AgentUpdateBadge({ agent, upgradeTo }: { agent: Agent; upgradeTo?: string | null }) {
   if (agent.updatePhase === 'idle') {
     if (!upgradeTo) return null;
+    // 원격 업데이트가 안 되는 구버전은 버튼을 눌러도 막히므로, 배지에서부터 다르게 말한다.
+    const manual = !agent.remoteUpdateSupported;
     return (
-      <div className="px-4 py-1.5 border-t border-service-color/20 bg-service-color/5 flex items-center gap-1.5 text-[10px] text-service-color">
+      <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-[10px] ${manual
+        ? 'border-yellow-500/20 bg-yellow-500/5 text-yellow-400'
+        : 'border-service-color/20 bg-service-color/5 text-service-color'}`}>
         <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
-        <span className="font-medium">업데이트 가능</span>
-        <span className="font-mono opacity-70">v{upgradeTo}</span>
+        <span className="font-medium">{manual ? '수동 업데이트 필요' : '업데이트 가능'}</span>
+        <span className="font-mono opacity-70">{upgradeTo}</span>
       </div>
     );
   }
@@ -81,7 +85,7 @@ export function AgentUpdateBadge({ agent, upgradeTo }: { agent: Agent; upgradeTo
     <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-[10px] ${phase.tone}`}>
       <PhaseIcon phase={agent.updatePhase} spinning={phase.spinning} />
       <span className="font-medium">{phase.label}</span>
-      {agent.updateTarget && <span className="font-mono opacity-70">v{agent.updateTarget}</span>}
+      {agent.updateTarget && <span className="font-mono opacity-70">{agent.updateTarget}</span>}
     </div>
   );
 }
@@ -105,7 +109,7 @@ export default function AgentUpdateStatus({
         <span className="text-xs font-semibold">{phase.label}</span>
         {agent.updateTarget && (
           <span className="text-[10px] font-mono opacity-70">
-            {agent.agentVersion ? `v${agent.agentVersion} → ` : ''}v{agent.updateTarget}
+            {agent.agentVersion ? `${agent.agentVersion} → ` : ''}{agent.updateTarget}
           </span>
         )}
         {settled && onAcknowledge && (

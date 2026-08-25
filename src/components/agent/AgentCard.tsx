@@ -20,11 +20,13 @@ export interface Agent {
   updateStartedAt: string | null;
   /** 올라갈 수 있는 릴리즈. 판정은 Hub가 한다 (SemVer 비교 + 프로토콜 지원 범위). */
   upgrade: { version: string; notes: string | null } | null;
+  /** 원격 업데이트(update-agent)를 처리할 수 있는 빌드인지. 0.6.0 미만은 false. */
+  remoteUpdateSupported: boolean;
 }
 
 /** 버전을 보고하지 않는 Agent는 버전 필드가 도입되기 전(0.5.0 미만) 빌드다. */
 export function formatAgentVersion(version: string | null) {
-  return version ? `v${version}` : '< 0.5.0';
+  return version ?? '< 0.5.0';
 }
 
 export const statusDot: Record<Agent['agentStatus'], string> = {

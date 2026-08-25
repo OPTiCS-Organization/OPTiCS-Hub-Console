@@ -90,7 +90,7 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
       </div>
 
       <div className="mt-auto flex items-center justify-between border-t border-border-color px-4 py-2.5">
-        <span className="text-secondary-text-color/60 text-[10px] font-mono">v{service.serviceVersion}</span>
+        <span className="text-secondary-text-color/60 text-[10px] font-mono">{service.serviceVersion}</span>
         <span className="text-secondary-text-color/60 text-[10px]">
           {portMappings.map(mapping => `:${mapping.hostPort} -> :${mapping.containerPort}`).join(', ')}
         </span>

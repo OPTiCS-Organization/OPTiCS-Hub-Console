@@ -13,6 +13,8 @@ import {
 } from '../components/agent/AgentCard';
 import AgentUpdateStatus from "../components/agent/AgentUpdateStatus";
 import AgentUpdatePanel, { type AgentUpgrade } from "../components/agent/AgentUpdatePanel";
+import MetricSparkline from "../components/agent/MetricSparkline";
+import AgentUpdateConfirm from "../components/agent/AgentUpdateConfirm";
 import SshTerminal from '../components/agent/SshTerminal';
 import TerminalAuthModal from '../components/agent/TerminalAuthModal';
 import { useAuth } from '../context/Auth.context';
@@ -22,6 +24,21 @@ import { apiFetch } from '../lib/apiFetch';
 import Tooltip from '../components/ui/Tooltip';
 
 type TabKey = 'overview' | 'terminal';
+
+type AgentUpdateEvent = {
+  agentUuid: string;
+  agentVersion: string | null;
+  updatePhase: Agent['updatePhase'];
+  updateTarget: string | null;
+  updateMessage: string | null;
+  updateStartedAt: string | null;
+};
+
+/** 더 이상 전이가 없는 단계. 이때만 전체 정보를 다시 읽는다. */
+const SETTLED_PHASES: Agent['updatePhase'][] = ['idle', 'succeeded', 'rolled_back', 'failed'];
+
+/** 메트릭 폴링 주기. 그래프의 시간 축 계산에 쓰인다. */
+const METRIC_INTERVAL_SECONDS = 2;
 
 type AgentMetrics = {
   timestamp: number;
@@ -67,31 +84,6 @@ function RadialGauge({ value, size = 56, strokeWidth = 5 }: { value: number; siz
   );
 }
 
-function Sparkline({ data }: { data: number[] }) {
-  const width = 100;
-  const height = 26;
-  if (data.length < 2) {
-    return <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} />;
-  }
-  const points = data.map((value, index) => {
-    const x = (index / (data.length - 1)) * width;
-    const y = height - Math.min(1, Math.max(0, value)) * height;
-    return `${x},${y}`;
-  }).join(' ');
-  return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="overflow-visible">
-      <polyline
-        points={points}
-        fill="none"
-        stroke="var(--color-service-color)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        opacity="0.7"
-      />
-    </svg>
-  );
-}
 
 function MetricCard({
   title,
@@ -127,7 +119,7 @@ function MetricCard({
         </div>
       </div>
       <div className="mt-3 border-t border-border-color/40 pt-2">
-        <Sparkline data={history} />
+        <MetricSparkline data={history} label={title} sampleSeconds={METRIC_INTERVAL_SECONDS} />
       </div>
     </div>
   );
@@ -149,14 +141,15 @@ export default function AgentDetail() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [terminalToken, setTerminalToken] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState(false);
-  const [updating, setUpdating] = useState(false);
 
-  const loadAgent = useCallback(async () => {
+  // silent: 소켓 이벤트로 인한 재조회. 페이지 전체를 스피너로 갈아치우면
+  // 업데이트 진행 중 로그가 올 때마다 화면이 통째로 깜빡인다.
+  const loadAgent = useCallback(async (options?: { silent?: boolean }) => {
     if (!currentWorkspace) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!options?.silent) setLoading(true);
     try {
       const response = await apiFetch(
         `/v1/agent/workspace/${currentWorkspace.workspaceIndex}`,
@@ -166,7 +159,7 @@ export default function AgentDetail() {
       const body = await response.json().catch(() => ({})) as { data?: { agents?: Agent[] } };
       setAgent(body.data?.agents?.find(item => item.agentUuid === agentUuid) ?? null);
     } finally {
-      setLoading(false);
+      if (!options?.silent) setLoading(false);
     }
   }, [agentUuid, currentWorkspace, logout]);
 
@@ -196,9 +189,22 @@ export default function AgentDetail() {
       setCpuHistory(prev => [...prev, payload.metrics.cpu.usage].slice(-30));
       setMemHistory(prev => [...prev, payload.metrics.memory.usage].slice(-30));
     });
-    connection.on('agent-updated', () => { void loadAgent(); });
-    connection.on('agent-update', () => { void loadAgent(); });
-    const timer = window.setInterval(requestMetrics, 2000);
+    connection.on('agent-updated', () => { void loadAgent({ silent: true }); });
+    connection.on('agent-update', (payload: AgentUpdateEvent) => {
+      if (payload.agentUuid !== agentUuid) return;
+      // 진행 중 전이는 페이로드만으로 충분하다. 왕복을 없애면 깜빡임도 요청 폭주도 사라진다.
+      setAgent(prev => prev && ({
+        ...prev,
+        agentVersion: payload.agentVersion ?? prev.agentVersion,
+        updatePhase: payload.updatePhase,
+        updateTarget: payload.updateTarget,
+        updateMessage: payload.updateMessage,
+        updateStartedAt: payload.updateStartedAt,
+      }));
+      // 끝난 뒤에는 버전과 업그레이드 대상이 달라지므로 그때 한 번만 다시 읽는다.
+      if (SETTLED_PHASES.includes(payload.updatePhase)) void loadAgent({ silent: true });
+    });
+    const timer = window.setInterval(requestMetrics, METRIC_INTERVAL_SECONDS * 1000);
 
     return () => {
       window.clearInterval(timer);
@@ -219,59 +225,34 @@ export default function AgentDetail() {
 
   async function requestUpdate(release: AgentUpgrade) {
     if (!agent) return;
-    setUpdating(true);
-    try {
-      const response = await apiFetch(
-        `/v1/agent/${encodeURIComponent(agent.agentUuid)}/update`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ version: release.version }),
-        },
-        logout,
-      );
-      if (response.ok) closeModal({ force: true });
-      // 이후 진행 상황은 Hub가 agent-update 이벤트로 밀어준다. 여기서 폴링하지 않는다.
-      void loadAgent();
-    } finally {
-      setUpdating(false);
-    }
+    const response = await apiFetch(
+      `/v1/agent/${encodeURIComponent(agent.agentUuid)}/update`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version: release.version }),
+      },
+      logout,
+    );
+    if (response.ok) closeModal({ force: true });
+    // 이후 진행 상황은 Hub가 agent-update 이벤트로 밀어준다. 여기서 폴링하지 않는다.
+    void loadAgent();
   }
+
 
   function handleUpdate(release: AgentUpgrade) {
     if (!agent) return;
     openModal('에이전트 업데이트', (
-      <div className="space-y-4">
-        <p className="text-xs text-secondary-text-color">
-          '{agent.agentName}'을(를) v{release.version}(으)로 업데이트합니다.
-          교체하는 동안 <strong className="text-primary-text-color">5~10초 정도 연결이 끊깁니다.</strong>
-          이 에이전트가 배포한 서비스는 계속 실행되지만, 그동안 로그 수집과 웹 터미널은 중단됩니다.
-        </p>
-        <p className="text-xs text-secondary-text-color">
-          새 버전이 기동에 실패하면 자동으로 이전 버전으로 되돌아갑니다.
-        </p>
-        <div className="flex justify-end gap-2 border-t border-border-color pt-3">
-          <button
-            type="button"
-            onClick={() => closeModal()}
-            disabled={updating}
-            className="h-8 rounded-sm border border-border-color px-3 text-xs text-secondary-text-color transition-colors hover:bg-white/5 hover:text-primary-text-color cursor-pointer disabled:opacity-50"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={() => { void requestUpdate(release); }}
-            disabled={updating}
-            className="inline-flex h-8 items-center gap-2 rounded-sm bg-service-color px-3.5 text-xs font-semibold text-white transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {updating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            업데이트
-          </button>
-        </div>
-      </div>
+      <AgentUpdateConfirm
+        agentName={agent.agentName}
+        currentVersion={agent.agentVersion}
+        targetVersion={release.version}
+        onConfirm={() => requestUpdate(release)}
+        onCancel={() => closeModal()}
+      />
     ));
   }
+
 
   /** 성공/실패 표시를 닫는다. 결과는 사용자가 볼 때까지 남아 있어야 하므로 자동으로 지우지 않는다. */
   async function acknowledgeUpdate() {

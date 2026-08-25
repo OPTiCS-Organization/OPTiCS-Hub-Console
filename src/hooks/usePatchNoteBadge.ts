@@ -18,7 +18,7 @@ function latestVersion(): string {
 }
 
 // localStorage는 시크릿 모드나 쿠키 차단 설정에서 접근만 해도 예외를 던진다.
-// 알림 배지 하나 때문에 화면 전체가 죽으면 안 되므로 실패는 조용히 흘린다.
+// 알림 배지 하나 때문에 화면 전체가 죽으면 안 되므로 실패는 흘린다.
 function readSeenVersion(): string | null {
   try {
     return localStorage.getItem(STORAGE_KEY);
