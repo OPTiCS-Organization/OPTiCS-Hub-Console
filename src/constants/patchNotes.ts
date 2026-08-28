@@ -92,9 +92,9 @@ export const patchNotes: PatchNoteEntry[] = [
   {
     version: "0.6.0",
     codename: "Asterism",
-    date: "2026-08-25",
+    date: "2026-08-28",
     highlight: true,
-    warning: "이 업데이트를 적용하려면 OPTiCS Agent 0.6.0 수동 업데이트가 필요합니다.",
+    warning: "이 업데이트를 적용하려면 OPTiCS Agent 0.6.0 수동 업데이트가 필요합니다. 0.6.0 미만 버전의 Agent는 더 이상 OPTiCS Hub에 연결되지 않으며, 연결된 서비스도 함께 중단됩니다.",
     versions: [
       { scope: "OPTiCS Hub", from: "0.5.5", to: "0.6.0" },
       { scope: "OPTiCS Console", from: "0.5.5", to: "0.6.0" },
@@ -110,7 +110,9 @@ export const patchNotes: PatchNoteEntry[] = [
       { kind: 'changed', description: "OPTiCS Console에서 키보드로 이동할 때 현재 선택된 항목이 표시되도록 개선했습니다." },
       { kind: 'changed', description: "OPTiCS Gateway의 라우팅 오류 피드백 페이지에서 더 상세한 정보를 제공하도록 개선했습니다." },
       { kind: 'changed', description: "OPTiCS Agent 및 OPTiCS Gateway의 터널링 로직을 수정해 서비스 요청 지연시간을 소폭 단축했습니다." },
+      { kind: 'changed', description: "OPTiCS Hub가 지원하지 않는 프로토콜 버전의 OPTiCS Agent 연결을 거부합니다." },
       { kind: 'fixed', partialFix: true, description: "OPTiCS Agent에서 반환하는 응답이 매우 길 경우 응답 본문이 잘리던 문제를 수정했습니다." },
+      { kind: 'security', description: "OPTiCS Agent와 OPTiCS Hub가 주고받는 모든 통신에 서명 검증을 도입했습니다." },
     ]
   },
   {
