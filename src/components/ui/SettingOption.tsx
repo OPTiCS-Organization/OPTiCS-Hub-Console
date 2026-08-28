@@ -1,4 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
+import { Loader2 } from "lucide-react";
 import { dangerSoftButtonClass } from "../../constants/danger";
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -9,7 +10,21 @@ export enum SettingType {
   Input = 'Input',
 }
 
-function ActionButton({ label, onClick, danger, disabled }: { label: string; onClick?: () => void; danger?: boolean; disabled?: boolean }) {
+/**
+ * loading은 disabled와 따로 받는다.
+ *
+ * 둘을 하나로 묶으면 "서버를 기다리는 중"과 "지금은 누를 수 없음"이 같은 모습이 되어,
+ * 사용자는 기다리면 되는지 아니면 조건을 채워야 하는지 알 수 없다.
+ * 스피너는 앞의 경우에만 돈다. (SubmitButton과 같은 규칙)
+ */
+function ActionButton({ label, onClick, danger, disabled, loading }: { label: string; onClick?: () => void; danger?: boolean; disabled?: boolean; loading?: boolean }) {
+  const content = (
+    <>
+      {loading && <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />}
+      {label}
+    </>
+  );
+
   // danger 변형은 constants/danger.ts 의 soft 규격을 그대로 쓴다. 설정 목록 안에 섞여
   // 있는 버튼이라 시선을 끌면 안 되는 자리이기 때문이다(문서 참고). 크기/폭은 이 컴포넌트가
   // 정하고, 고정 높이 + items-center 로 잡아 글자가 위로 쏠리던 문제를 없앤다.
@@ -18,10 +33,11 @@ function ActionButton({ label, onClick, danger, disabled }: { label: string; onC
       <button
         type="button"
         onClick={onClick}
-        disabled={disabled}
-        className={`inline-flex h-8 items-center justify-center px-3.5 text-xs font-semibold ${dangerSoftButtonClass}`}
+        disabled={disabled || loading}
+        aria-busy={loading}
+        className={`inline-flex h-8 items-center justify-center gap-1.5 px-3.5 text-xs font-semibold ${dangerSoftButtonClass}`}
       >
-        {label}
+        {content}
       </button>
     );
   }
@@ -29,15 +45,16 @@ function ActionButton({ label, onClick, danger, disabled }: { label: string; onC
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
-      className="inline-flex h-8 items-center justify-center rounded-sm bg-service-color px-4 text-sm font-semibold text-white cursor-pointer transition-colors duration-100 hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
+      disabled={disabled || loading}
+      aria-busy={loading}
+      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm bg-service-color px-4 text-sm font-semibold text-white cursor-pointer transition-colors duration-100 hover:bg-button-progress-color disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-service-color/50"
     >
-      {label}
+      {content}
     </button>
   );
 }
 
-function InputAction({ id, value, onChange, placeholder, suffix, maxLength, buttonLabel, onClick, disabled }: { id: string; value?: string; onChange?: (v: string) => void; placeholder?: string; suffix?: string; maxLength?: number; buttonLabel?: string; onClick?: () => void; disabled?: boolean }) {
+function InputAction({ id, value, onChange, placeholder, suffix, maxLength, buttonLabel, onClick, disabled, loading }: { id: string; value?: string; onChange?: (v: string) => void; placeholder?: string; suffix?: string; maxLength?: number; buttonLabel?: string; onClick?: () => void; disabled?: boolean; loading?: boolean }) {
   return (
     <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
       <div className="flex min-w-0 flex-1 items-center rounded-sm border border-border-color bg-background-color px-2 transition-colors duration-100 focus-within:border-service-color sm:flex-none">
@@ -52,7 +69,7 @@ function InputAction({ id, value, onChange, placeholder, suffix, maxLength, butt
         />
         {suffix && <span className="shrink-0 text-xs text-secondary-text-color whitespace-nowrap">{suffix}</span>}
       </div>
-      <ActionButton label={buttonLabel ?? "변경"} onClick={onClick} disabled={disabled} />
+      <ActionButton label={buttonLabel ?? "변경"} onClick={onClick} disabled={disabled} loading={loading} />
     </div>
   );
 }
@@ -92,6 +109,8 @@ type SettingOptionProps = {
   value?: boolean;
   onChange?: (next: boolean) => void;
   buttonDisabled?: boolean;
+  /** 서버 응답을 기다리는 중. 버튼에 스피너가 돌고 눌리지 않는다. */
+  buttonLoading?: boolean;
   inputValue?: string;
   onInputChange?: (v: string) => void;
   inputPlaceholder?: string;
@@ -100,7 +119,7 @@ type SettingOptionProps = {
   toggleDisabled?: boolean;
 };
 
-export function SettingOption({ settingName, description = "", type, buttonLabel, onClick, value, onChange, buttonDisabled, inputValue, onInputChange, inputPlaceholder, inputSuffix, maxLength, toggleDisabled, }: SettingOptionProps) {
+export function SettingOption({ settingName, description = "", type, buttonLabel, onClick, value, onChange, buttonDisabled, buttonLoading, inputValue, onInputChange, inputPlaceholder, inputSuffix, maxLength, toggleDisabled, }: SettingOptionProps) {
   // Input 타입에서 label과 input을 연결하기 위한 id. 항목마다 고유해야 하므로
   // settingName이 아닌 useId로 발급한다(같은 이름의 설정이 여러 페이지에 있어도 안전).
   const inputId = useId();
@@ -108,16 +127,16 @@ export function SettingOption({ settingName, description = "", type, buttonLabel
   let typeNode: ReactNode;
   switch (type) {
     case SettingType.Button:
-      typeNode = <ActionButton label={buttonLabel ?? settingName} onClick={onClick} disabled={buttonDisabled} />;
+      typeNode = <ActionButton label={buttonLabel ?? settingName} onClick={onClick} disabled={buttonDisabled} loading={buttonLoading} />;
       break;
     case SettingType.Button_Danger:
-      typeNode = <ActionButton label={buttonLabel ?? settingName} onClick={onClick} danger disabled={buttonDisabled} />;
+      typeNode = <ActionButton label={buttonLabel ?? settingName} onClick={onClick} danger disabled={buttonDisabled} loading={buttonLoading} />;
       break;
     case SettingType.Toggle:
       typeNode = <Toggle value={value} onChange={onChange} disabled={toggleDisabled} label={settingName} />;
       break;
     case SettingType.Input:
-      typeNode = <InputAction id={inputId} value={inputValue} onChange={onInputChange} placeholder={inputPlaceholder} suffix={inputSuffix} maxLength={maxLength} buttonLabel={buttonLabel} onClick={onClick} disabled={buttonDisabled} />;
+      typeNode = <InputAction id={inputId} value={inputValue} onChange={onInputChange} placeholder={inputPlaceholder} suffix={inputSuffix} maxLength={maxLength} buttonLabel={buttonLabel} onClick={onClick} disabled={buttonDisabled} loading={buttonLoading} />;
       break;
   }
 

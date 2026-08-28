@@ -1,5 +1,6 @@
 import { Loader2, CheckCircle2, AlertTriangle, Undo2, ArrowUpCircle } from "lucide-react";
 import type { Agent } from "./AgentCard";
+import Tooltip from "../ui/Tooltip";
 
 export type UpdatePhase = Agent['updatePhase'];
 
@@ -10,83 +11,113 @@ export type UpdatePhase = Agent['updatePhase'];
  */
 const PHASE: Record<Exclude<UpdatePhase, 'idle'>, {
   label: string;
+  /** 카드 배지에 들어가는 짧은 말. 알약 하나에 담겨야 하므로 label보다 짧다. */
+  short: string;
   detail: string;
   tone: string;
+  /** 카드 배지용. 테두리 없이 배경과 글자색만 쓴다. */
+  pillTone: string;
   spinning: boolean;
 }> = {
   requested: {
     label: '업데이트 요청됨',
+    short: '요청됨',
     detail: 'Agent가 업데이트 작업을 준비하고 있습니다.',
     tone: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
+    pillTone: 'text-sky-400 bg-sky-500/15',
     spinning: true,
   },
   pulling: {
     label: '이미지 내려받는 중',
+    short: '내려받는 중',
     detail: '교체할 버전의 Agent 이미지를 내려받는 중입니다.',
     tone: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
+    pillTone: 'text-sky-400 bg-sky-500/15',
     spinning: true,
   },
   restarting: {
     label: '재시작 중',
+    short: '재시작 중',
     detail: 'Agent를 다시 시작하는 중입니다. 배포된 Service는 중단되지 않습니다. 이 단계에서는 Service에 다가가는 요청이 모두 거부됩니다.',
     tone: 'text-warning-color bg-warning-color/10 border-warning-color/20',
+    pillTone: 'text-warning-color bg-warning-color/15',
     spinning: true,
   },
   succeeded: {
     label: '업데이트 완료',
+    short: '완료',
     detail: 'Agent가 새 버전으로 정상 시작했습니다.',
     tone: 'text-success-color bg-success-color/10 border-success-color/20',
+    pillTone: 'text-success-color bg-success-color/15',
     spinning: false,
   },
   rolled_back: {
     label: '되돌려짐',
+    short: '되돌림',
     detail: 'Agent가 새 버전 시작에 실패하여 이전 버전으로 복구했습니다.',
     tone: 'text-caution-color bg-caution-color/10 border-caution-color/20',
+    pillTone: 'text-caution-color bg-caution-color/15',
     spinning: false,
   },
   failed: {
     label: '업데이트 실패',
+    short: '실패',
     detail: "Agent 호스트에서 'docker logs optics-agent-updater'로 원인을 확인하세요.",
     tone: 'text-danger-color bg-danger-color/10 border-danger-color/20',
+    pillTone: 'text-danger-color bg-danger-color/15',
     spinning: false,
   },
 };
 
-function PhaseIcon({ phase, spinning }: { phase: Exclude<UpdatePhase, 'idle'>; spinning: boolean }) {
-  if (spinning) return <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin" />;
-  if (phase === 'succeeded') return <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />;
-  if (phase === 'rolled_back') return <Undo2 className="w-3.5 h-3.5 shrink-0" />;
-  return <AlertTriangle className="w-3.5 h-3.5 shrink-0" />;
+/** small은 목록 카드의 알약용. 상세 화면보다 한 단계 작다. */
+function PhaseIcon({ phase, spinning, small = false }: { phase: Exclude<UpdatePhase, 'idle'>; spinning: boolean; small?: boolean }) {
+  const size = small ? 'w-3 h-3 shrink-0' : 'w-3.5 h-3.5 shrink-0';
+  if (spinning) return <Loader2 className={`${size} animate-spin`} />;
+  if (phase === 'succeeded') return <CheckCircle2 className={size} />;
+  if (phase === 'rolled_back') return <Undo2 className={size} />;
+  return <AlertTriangle className={size} />;
 }
 
 /**
- * 카드에 얹는 한 줄짜리 요약.
- * 진행 중이 아니더라도 올릴 수 있는 버전이 있으면 알린다.
- * 목록에서 보이지 않으면 사용자는 에이전트마다 상세로 들어가 봐야 업데이트 존재를 알게 된다.
+ * Agent 목록 카드의 헤더에서 연결 배지 옆에 붙는 알약.
+ *
+ * 예전에는 카드 폭 전체를 쓰는 색깔 띠였다. 목록에서 필요한 것은 "업데이트가 있다"는
+ * 사실과 대상 버전뿐인데, 띠가 카드마다 있다 없다 하면서 카드 높이를 흔들었고
+ * 무엇보다 목록 전체에서 가장 큰 색면이 되어 정작 봐야 할 Agent 이름과 상태를 눌렀다.
+ * 단계 설명은 상세 화면(AgentUpdateStatus)이 이미 온전히 맡고 있으므로,
+ * 목록에서는 알약으로 줄이고 나머지 말은 툴팁으로 내렸다.
+ *
+ * 연결 배지와 같은 형태를 쓰는 이유는 둘 다 "이 Agent의 지금 상태"라서다.
+ * 형태가 다르면 서로 다른 종류의 정보로 읽힌다.
  */
 export function AgentUpdateBadge({ agent, upgradeTo }: { agent: Agent; upgradeTo?: string | null }) {
+  const pillClass = 'inline-flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full text-3xs font-medium leading-none';
+
   if (agent.updatePhase === 'idle') {
     if (!upgradeTo) return null;
     // 원격 업데이트가 안 되는 구버전은 버튼을 눌러도 막히므로, 배지에서부터 다르게 말한다.
     const manual = !agent.remoteUpdateSupported;
     return (
-      <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-3xs ${manual
-        ? 'border-warning-color/20 bg-warning-color/5 text-warning-color'
-        : 'border-service-color/20 bg-service-color/5 text-service-color'}`}>
-        <ArrowUpCircle className="w-3.5 h-3.5 shrink-0" />
-        <span className="shrink-0 font-medium">{manual ? '수동 업데이트 필요' : '업데이트 가능'}</span>
-        <span className="min-w-0 truncate font-mono opacity-70">{upgradeTo}</span>
-      </div>
+      <Tooltip label={manual
+        ? `수동 업데이트 필요 · ${upgradeTo} (이 빌드는 원격 업데이트를 지원하지 않습니다)`
+        : `업데이트 가능 · ${upgradeTo}`}>
+        <span className={`${pillClass} ${manual ? 'bg-warning-color/15 text-warning-color' : 'bg-service-color/15 text-service-color'}`}>
+          <ArrowUpCircle className="w-3 h-3 shrink-0" />
+          <span className="font-mono">{upgradeTo}</span>
+        </span>
+      </Tooltip>
     );
   }
+
   const phase = PHASE[agent.updatePhase];
 
   return (
-    <div className={`px-4 py-1.5 border-t flex items-center gap-1.5 text-3xs ${phase.tone}`}>
-      <PhaseIcon phase={agent.updatePhase} spinning={phase.spinning} />
-      <span className="font-medium">{phase.label}</span>
-      {agent.updateTarget && <span className="font-mono opacity-70">{agent.updateTarget}</span>}
-    </div>
+    <Tooltip label={`${phase.label}${agent.updateTarget ? ` · ${agent.updateTarget}` : ''} — ${phase.detail}`}>
+      <span className={`${pillClass} ${phase.pillTone}`}>
+        <PhaseIcon phase={agent.updatePhase} spinning={phase.spinning} small />
+        {phase.short}
+      </span>
+    </Tooltip>
   );
 }
 

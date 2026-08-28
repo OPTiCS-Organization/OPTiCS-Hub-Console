@@ -99,6 +99,7 @@ export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCa
             <span className={`inline-block px-2 py-0.5 rounded-full text-3xs font-medium leading-none shrink-0 ${connectionBadge[agent.agentConnection]}`}>
               {connectionLabel[agent.agentConnection]}
             </span>
+            <AgentUpdateBadge agent={agent} upgradeTo={upgradeTo} />
           </div>
           <p className="text-secondary-text-color text-xs font-mono">
             {agent.agentCode}
@@ -108,7 +109,6 @@ export default function AgentCard({ agent, upgradeTo, onOpen, onDisconnect, onCa
           </p>
         </div>
       </div>
-      <AgentUpdateBadge agent={agent} upgradeTo={upgradeTo} />
       <div className="px-4 py-2.5 border-t border-border-color flex items-center justify-between gap-2">
         <span className="min-w-0 truncate text-secondary-text-color/60 text-3xs font-mono">
           {formatAgentVersion(agent.agentVersion)}

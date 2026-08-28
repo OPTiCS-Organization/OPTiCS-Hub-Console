@@ -90,6 +90,24 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.6.1",
+    codename: undefined,
+    date: "2026-08-28",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.6.0", to: "0.6.1" },
+      { scope: "OPTiCS Console", from: "0.6.0", to: "0.6.1" },
+      { scope: "OPTiCS Agent", from: "0.6.0", to: "0.6.1" },
+    ],
+    changes: [
+      { kind: 'fixed', description: "OPTiCS Gateway가 기동하지 못해 모든 서비스 주소가 응답하지 않던 문제를 수정했습니다." },
+      { kind: 'fixed', description: "OPTiCS Hub가 연결된 OPTiCS Agent를 찾지 못해 서비스 접속 요청이 실패하던 문제를 수정했습니다." },
+      { kind: 'fixed', description: "OPTiCS Agent가 자신의 버전을 보고하지 못해 OPTiCS Console에서 버전이 비어 보이고 원격 업데이트를 사용할 수 없던 문제를 수정했습니다." },
+      { kind: 'fixed', description: "OPTiCS Console을 한동안 열어두었다가 다시 사용할 때 로그인이 임의로 풀리던 문제를 수정했습니다." },
+      { kind: 'changed', description: "OPTiCS Console의 Agent 목록에서 업데이트 알림이 카드를 가득 채우던 것을 작은 배지로 줄였습니다." },
+      { kind: 'changed', description: "OPTiCS Console의 Settings에서 2단계 인증 상태를 확인하는 동안 진행 표시가 나타나도록 개선했습니다." },
+    ]
+  },
+  {
     version: "0.6.0",
     codename: "Asterism",
     date: "2026-08-28",
@@ -99,6 +117,8 @@ export const patchNotes: PatchNoteEntry[] = [
       { scope: "OPTiCS Hub", from: "0.5.5", to: "0.6.0" },
       { scope: "OPTiCS Console", from: "0.5.5", to: "0.6.0" },
       { scope: "OPTiCS Agent", from: "0.5.3", to: "0.6.0" },
+      { scope: "OPTiCS Linux Installer (Arch/Ubuntu)", from: "0.3.3", to: "0.4.0" },
+      { scope: "OPTiCS Windows Installer (10/11)", from: "0.2.0", to: "0.4.0" },
     ],
     changes: [
       { kind: 'added', beta: true, description: "OPTiCS Console에서 OPTiCS Agent를 원격으로 업데이트하는 기능을 추가했습니다." },

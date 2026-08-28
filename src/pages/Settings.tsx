@@ -125,8 +125,9 @@ export default function Settings() {
           settingName="2단계 인증"
           description={twoFactorDescription}
           type={isTotpActive ? SettingType.Button_Danger : SettingType.Button}
-          buttonLabel={isLoadingTotp ? "확인 중..." : totpStatusError ? "다시 시도" : isTotpActive ? "해제" : "등록"}
-          buttonDisabled={isLoadingTotp || blockedByVerification}
+          buttonLabel={isLoadingTotp ? "확인 중" : totpStatusError ? "다시 시도" : isTotpActive ? "해제" : "등록"}
+          buttonLoading={isLoadingTotp}
+          buttonDisabled={blockedByVerification}
           onClick={handleTwoFactorAction}
         />
       </Section>
