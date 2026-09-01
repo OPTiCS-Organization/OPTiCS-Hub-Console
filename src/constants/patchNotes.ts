@@ -90,6 +90,20 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.7.0",
+    codename: "Doppler",
+    date: "2026-09-01",
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.6.1", to: "0.7.0" },
+      { scope: "OPTiCS Console", from: "0.6.1", to: "0.7.0" },
+      { scope: "OPTiCS Agent", from: "0.6.1", to: "0.7.0" },
+    ],
+    changes: [
+      { kind: 'changed', beta: true, description: "OPTiCS Agent가 OPTiCS Gateway에 연결 풀을 생성해두도록 변경해 서비스 레이턴시를 소폭 개선했습니다." },
+      { kind: 'fixed', description: "OPTiCS Agent 내부에서 일부 구성 요소가 중복으로 생성되어 서비스 상태와 알림이 서로 어긋날 수 있던 문제를 수정했습니다." },
+    ]
+  },
+  {
     version: "0.6.1",
     codename: undefined,
     date: "2026-08-28",
