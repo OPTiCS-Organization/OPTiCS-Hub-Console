@@ -16,6 +16,7 @@ import Services from "./pages/Services"
 import ServiceDetail from "./pages/ServiceDetail"
 import AgentDetail from "./pages/AgentDetail"
 import PatchNotes from "./pages/PatchNotes"
+import Admin from "./pages/Admin"
 import UnverifiedBanner from "./components/UnverifiedBanner"
 
 function AppLayout() {
@@ -31,7 +32,12 @@ function AppLayout() {
           남은 자리 안에 본문을 가운데 정렬한다. 최대 폭을 두는 것은 넓은 화면에서
           한 줄이 지나치게 길어지지 않게 하기 위한 것이다.
         */}
-        <div className="mx-auto flex w-full max-w-[80rem] flex-1 flex-col">
+        {/*
+          min-h-0 이 없으면 flex 아이템의 기본값(min-height:auto)이 내용보다 작아지는 것을 막아,
+          로그 패널처럼 안에서 스크롤해야 하는 화면이 스스로 늘어나 버린다. 그러면 패널 대신
+          바깥 main 이 스크롤되어 "패널이 안 스크롤된다"로 나타난다.
+        */}
+        <div className="mx-auto flex min-h-0 w-full max-w-[80rem] flex-1 flex-col">
           <UnverifiedBanner />
           <Routes>
             <Route path="/dashboard" element={<Dashboard />} />
@@ -45,6 +51,7 @@ function AppLayout() {
             <Route path="/services" element={<Services />} />
             <Route path="/services/:serviceIndex" element={<ServiceDetail />} />
             <Route path="/patch-notes" element={<PatchNotes />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

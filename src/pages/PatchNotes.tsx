@@ -1,11 +1,43 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle } from "lucide-react";
-import { patchNotes, changeKindLabel, changeKindDotClass, changeKindOrder, badgeBaseClass, currentBadgeClass, importantBadgeClass, betaBadgeClass, partialFixBadgeClass, partialFixBadgeHint } from "../constants/patchNotes";
-import packageJson from "../../package.json";
+import { AlertTriangle, Check, Copy } from "lucide-react";
+import { patchNotes, currentVersion, changeKindLabel, changeKindDotClass, changeKindOrder, badgeBaseClass, currentBadgeClass, importantBadgeClass, betaBadgeClass, partialFixBadgeClass, partialFixBadgeHint } from "../constants/patchNotes";
 import { markPatchNotesSeen, useUnreadPatchNoteCount } from "../hooks/usePatchNoteBadge";
 
 /** 새 버전 강조를 유지하는 시간. 이후 transition으로 서서히 지운다. */
 const HIGHLIGHT_DURATION_MS = 5000;
+
+function WarningCommand({ command }: { command: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // 클립보드가 막힌 환경에서는 직접 선택해 복사하면 된다. 경고 위에 오류를 더 얹지 않는다.
+    }
+  }
+
+  return (
+    <div className="mt-2.5 rounded-sm border border-warning-color/25 bg-black/20">
+      <div className="flex items-center justify-between gap-2 border-b border-warning-color/15 px-2.5 py-1">
+        <span className="text-4xs uppercase tracking-wider text-warning-color/70">Bash</span>
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex shrink-0 items-center gap-1 text-3xs text-warning-color/80 transition-colors hover:text-warning-color cursor-pointer"
+        >
+          {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+          {copied ? "복사함" : "복사"}
+        </button>
+      </div>
+      <pre className="overflow-x-auto px-2.5 py-2 text-3xs leading-relaxed text-primary-text-color">
+        <code>{command}</code>
+      </pre>
+    </div>
+  );
+}
 
 /** YYYY-MM-DD -> 2026년 8월 11일 */
 function formatDate(iso: string) {
@@ -35,13 +67,13 @@ export default function PatchNotes() {
       <div className="mb-8">
         <h1 className="text-lg font-bold mb-1">Patch Notes</h1>
         <p className="text-secondary-text-color text-sm break-keep">
-          현재 OPTiCS Hub 버전은 <span className="font-mono text-primary-text-color">{packageJson.version}</span> 입니다.
+          현재 OPTiCS 버전은 <span className="font-mono text-primary-text-color">{currentVersion}</span> 입니다.
         </p>
       </div>
 
       <div className="flex flex-col">
         {patchNotes.map((note, index) => {
-          const isCurrent = note.version === packageJson.version;
+          const isCurrent = note.version === currentVersion;
           const isNew = unreadAtMount > 0 && index < unreadAtMount;
 
           return (
@@ -91,9 +123,12 @@ export default function PatchNotes() {
                 {note.warning && (
                   <div className="mb-4 flex items-start gap-2.5 rounded-sm border border-warning-color/30 bg-warning-color/10 px-3 py-2.5">
                     <AlertTriangle className="h-4 w-4 shrink-0 text-warning-color mt-px" />
-                    <span className="text-warning-color text-xs leading-relaxed break-keep">
-                      {note.warning}
-                    </span>
+                    <div className="min-w-0 flex-1">
+                      <span className="text-warning-color text-xs leading-relaxed break-keep">
+                        {note.warning}
+                      </span>
+                      {note.warningCommand && <WarningCommand command={note.warningCommand} />}
+                    </div>
                   </div>
                 )}
 

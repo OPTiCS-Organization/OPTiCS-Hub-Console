@@ -16,6 +16,7 @@ import AgentUpdatePanel, { type AgentUpgrade } from "../components/agent/AgentUp
 import MetricSparkline from "../components/agent/MetricSparkline";
 import AgentUpdateConfirm from "../components/agent/AgentUpdateConfirm";
 import AgentDisconnectConfirm from "../components/agent/AgentDisconnectConfirm";
+import ReleaseList from "../components/release/ReleaseList";
 import SshTerminal from '../components/agent/SshTerminal';
 import TerminalAuthModal from '../components/agent/TerminalAuthModal';
 import { dangerIconButtonClass } from '../constants/danger';
@@ -254,6 +255,19 @@ export default function AgentDetail() {
     ));
   }
 
+  /** 버전을 고른 뒤에도 확인 단계는 그대로 거친다. 고르는 것과 실행하는 것은 다른 결정이다. */
+  function handlePickVersion() {
+    if (!agent) return;
+    // 목록은 폭을 정하지 않고 모달이 주는 폭을 그대로 채운다.
+    // 여기서 고정 폭을 주면 모달(max-w-xl)보다 좁아져 오른쪽에 빈 띠가 남는다.
+    openModal('업데이트할 버전 선택', (
+      <ReleaseList
+        currentVersion={agent.agentVersion}
+        onSelect={handleUpdate}
+      />
+    ));
+  }
+
 
   /** 성공/실패 표시를 닫는다. 결과는 사용자가 볼 때까지 남아 있어야 하므로 자동으로 지우지 않는다. */
   async function acknowledgeUpdate() {
@@ -432,7 +446,7 @@ export default function AgentDetail() {
             </div>
 
             <AgentUpdateStatus agent={agent} onAcknowledge={() => void acknowledgeUpdate()} />
-            <AgentUpdatePanel agent={agent} onUpdate={handleUpdate} />
+            <AgentUpdatePanel agent={agent} onUpdate={handleUpdate} onPickVersion={handlePickVersion} />
 
             <InfoRow label="에이전트 코드">
               <span className="font-mono">{agent.agentCode}</span>

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import { patchNotes } from "../constants/patchNotes";
+import { patchNotes, currentVersion } from "../constants/patchNotes";
 
 /** 사용자가 마지막으로 확인한 패치노트 버전. */
 const STORAGE_KEY = "seenPatchNoteVersion";
@@ -10,12 +10,7 @@ const STORAGE_KEY = "seenPatchNoteVersion";
  * 최신 버전으로 시드하면 이 기능이 배포되는 릴리스에서는 아무도 알림을 못 본다.
  * 한 단계 이전으로 두어 첫 진입 때 최신 릴리스 하나가 강조되게 한다.
  */
-const FALLBACK_SEEN_VERSION = "0.5.2";
-
-/** patchNotes는 최신 항목이 배열 맨 앞이다. */
-function latestVersion(): string {
-  return patchNotes[0]?.version ?? "";
-}
+const FALLBACK_SEEN_VERSION = "0.7.0";
 
 // localStorage는 시크릿 모드나 쿠키 차단 설정에서 접근만 해도 예외를 던진다.
 // 알림 배지 하나 때문에 화면 전체가 죽으면 안 되므로 실패는 흘린다.
@@ -55,7 +50,7 @@ function subscribe(listener: () => void): () => void {
  */
 function unreadCount(): number {
   const seen = readSeenVersion();
-  if (seen === null || seen === latestVersion()) return 0;
+  if (seen === null || seen === currentVersion) return 0;
 
   const index = patchNotes.findIndex(note => note.version === seen);
   return index === -1 ? -1 : index;
@@ -71,7 +66,7 @@ export function useUnreadPatchNoteCount(): number {
 
 /** 패치노트를 열었을 때 호출한다. 기록을 최신으로 올리고 구독 중인 화면에 알린다. */
 export function markPatchNotesSeen(): void {
-  if (readSeenVersion() === latestVersion()) return;
-  writeSeenVersion(latestVersion());
+  if (readSeenVersion() === currentVersion) return;
+  writeSeenVersion(currentVersion);
   listeners.forEach(listener => listener());
 }
