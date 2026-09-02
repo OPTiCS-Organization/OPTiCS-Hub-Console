@@ -7,7 +7,7 @@ import { useModal } from "../context/Modal.context";
 import { useAuth } from "../context/Auth.context";
 import CreateWorkspaceModal from "./CreateWorkspaceModal";
 import Tooltip from "./ui/Tooltip";
-import packageJson from "../../package.json";
+import { currentVersion } from "../constants/patchNotes";
 import { useUnreadPatchNoteCount } from "../hooks/usePatchNoteBadge";
 
 const IconSize = 'w-4 h-4'
@@ -383,7 +383,7 @@ export default function Navigation() {
                 }`
               }
             >
-              {packageJson.version} <span className="font-light">Dev</span>
+              {currentVersion} <span className="font-light">Dev</span>
             </NavLink>
           </>
         )}

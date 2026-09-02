@@ -1,7 +1,8 @@
 /**
  * 패치노트. 릴리스와 함께 배포되므로 별도 API 없이 이 파일만 수정한다.
  *
- * 새 항목은 배열 맨 앞에 추가한다. version 은 package.json 의 값과 맞춘다.
+ * 새 항목은 배열 맨 앞에 추가한다. 맨 앞 항목의 version 이 곧 현재 버전(currentVersion)이며
+ * 화면에 표시되는 버전도 여기서 나온다. package.json 을 따로 맞출 필요는 없다.
  */
 
 export type ChangeKind = "added" | "changed" | "fixed" | "security";
@@ -21,6 +22,13 @@ export interface PatchNoteEntry {
   highlight?: boolean;
   /** 업그레이드 전 반드시 읽어야 하는 경고 (예: 다른 컴포넌트 수동 업그레이드 필요). */
   warning?: string;
+  /**
+   * 경고를 해소하기 위해 사용자가 호스트에서 실행해야 하는 명령.
+   *
+   * 설명 문장 안에 섞으면 어디까지가 명령인지 알 수 없어 그대로 붙여넣지 못한다.
+   * 복사 가능한 블록으로 따로 낸다. warning 없이 단독으로 쓰지 않는다.
+   */
+  warningCommand?: string;
   /** 컴포넌트별 버전 변경 표. Hub 외 Agent/Installer 등도 함께 릴리스될 때만 채운다. */
   versions?: ComponentVersionChange[];
   /**
@@ -89,6 +97,31 @@ export const changeKindDotClass: Record<ChangeKind, string> = {
 export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "security"];
 
 export const patchNotes: PatchNoteEntry[] = [
+  {
+    version: "0.7.1",
+    codename: undefined,
+    date: "2026-09-02",
+    highlight: true,
+    warning: "0.7.0 이하에서 OPTiCS Console의 원격 업데이트를 한 번이라도 사용한 OPTiCS Agent는 이 버전을 원격으로 설치할 수 없습니다. 아래 명령을 Agent 호스트에서 실행해 주세요. Console의 Web SSH 터미널에서도 실행할 수 있습니다. 이번 한 번만 수동 업데이트가 필요하며, 이후에는 원격 업데이트가 정상 동작합니다. (설치 경로를 바꿨다면 첫 줄을 그 경로로 바꿔 주세요.)",
+    warningCommand: [
+      "cd ~/.local/share/optics/agent",
+      "sed -i '/^AGENT_IMAGE_TAG=/d' .env",
+      "echo 'AGENT_IMAGE_TAG=0.7.1' >> .env",
+      "docker compose pull && docker compose up -d",
+    ].join("\n"),
+    versions: [
+      { scope: "OPTiCS Agent", from: "0.7.0", to: "0.7.1" },
+    ],
+    changes: [
+      { kind: 'added', beta: true, description: "OPTiCS Console에서 업데이트할 OPTiCS Agent 버전을 직접 고를 수 있습니다. 베타 릴리즈를 미리 사용해 보거나 특정 버전으로 맞출 때 사용하세요." },
+      { kind: 'added', description: "문제가 확인된 OPTiCS Agent 버전은 목록에 이유와 함께 표시되며 업데이트 대상으로 선택할 수 없습니다." },
+      { kind: 'added', description: "패치노트의 주의 사항에 필요한 명령이 함께 표시되며, 복사해 바로 사용할 수 있습니다." },
+      { kind: 'fixed', beta: true, description: "원격 업데이트를 한 번 사용한 뒤로는 다시 사용할 수 없던 문제를 수정했습니다." },
+      { kind: 'fixed', description: "OPTiCS Agent Dashboard가 실행 중이 아닐 때 원격 업데이트가 실패하던 문제를 수정했습니다." },
+      { kind: 'changed', description: "업데이트를 시작할 수 없는 상태에서는 아무것도 변경하지 않고 중단합니다. 실행 중인 OPTiCS Agent와 서비스는 영향을 받지 않습니다." },
+      { kind: 'changed', description: "업데이트에 실패해 이전 버전으로 되돌린 경우, 되돌리기가 실제로 완료됐는지 확인한 결과를 알려줍니다." },
+    ]
+  },
   {
     version: "0.7.0",
     codename: "Doppler",
@@ -259,3 +292,12 @@ export const patchNotes: PatchNoteEntry[] = [
     ],
   },
 ];
+
+/**
+ * 화면에 표시하는 현재 버전.
+ *
+ * package.json을 참조하면 릴리스마다 두 곳을 맞춰야 하고, 한쪽만 올라가면
+ * "Current" 배지가 어느 항목에도 붙지 않은 채 아무도 눈치채지 못한다.
+ * 목록 맨 앞 항목을 유일한 출처로 두어 패치노트를 추가하는 것만으로 버전이 따라오게 한다.
+ */
+export const currentVersion = patchNotes[0]?.version ?? "";
