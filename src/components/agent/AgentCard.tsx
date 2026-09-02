@@ -21,6 +21,11 @@ export interface Agent {
   updateStartedAt: string | null;
   /** 올라갈 수 있는 릴리즈. 판정은 Hub가 한다 (SemVer 비교 + 프로토콜 지원 범위). */
   upgrade: { version: string; notes: string | null } | null;
+  /**
+   * 지금 돌리고 있는 버전이 막혀 있다면 그 사유. 카탈로그에 없는 버전은 판단 근거가 없어 null이다.
+   * 목록을 열어봐야만 알 수 있으면 정작 그 버전을 쓰는 사람이 문제를 모른 채 계속 쓴다.
+   */
+  versionBlocked: string | null;
   /** 원격 업데이트(update-agent)를 처리할 수 있는 빌드인지. 0.6.0 미만은 false. */
   remoteUpdateSupported: boolean;
 }

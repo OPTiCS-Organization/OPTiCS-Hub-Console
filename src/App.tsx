@@ -16,6 +16,7 @@ import Services from "./pages/Services"
 import ServiceDetail from "./pages/ServiceDetail"
 import AgentDetail from "./pages/AgentDetail"
 import PatchNotes from "./pages/PatchNotes"
+import Admin from "./pages/Admin"
 import UnverifiedBanner from "./components/UnverifiedBanner"
 
 function AppLayout() {
@@ -45,6 +46,7 @@ function AppLayout() {
             <Route path="/services" element={<Services />} />
             <Route path="/services/:serviceIndex" element={<ServiceDetail />} />
             <Route path="/patch-notes" element={<PatchNotes />} />
+            <Route path="/admin" element={<Admin />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </div>

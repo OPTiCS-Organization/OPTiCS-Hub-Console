@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import type { ReactNode } from "react";
 import { NavLink } from "react-router-dom";
-import { LayoutPanelTop, Server, Settings, SlidersHorizontal, ChevronDown, Check, Plus, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash, FileText, PanelLeftClose, PanelLeftOpen, User, LogOut } from "lucide-react";
+import { LayoutPanelTop, Server, Settings, SlidersHorizontal, ChevronDown, Check, Plus, Loader2, ArrowLeft, Layers, LayoutDashboard, ServerCrash, FileText, PanelLeftClose, PanelLeftOpen, User, LogOut, ShieldCheck } from "lucide-react";
 import { useWorkspace } from "../context/Workspace.context";
 import { useModal } from "../context/Modal.context";
 import { useAuth } from "../context/Auth.context";
@@ -24,6 +24,12 @@ const mainMenu = [
   { name: 'Settings', path: '/settings', icon: <Settings className={IconSize} /> },
   { name: 'Patch Notes', path: '/patch-notes', icon: <FileText className={IconSize} /> },
 ]
+
+/**
+ * administrator에게만 보인다. 감추는 것은 화면 정리일 뿐 보안 경계가 아니며,
+ * 실제 차단은 Hub의 PermissionGuard가 한다.
+ */
+const adminMenu = { name: 'Admin', path: '/admin', icon: <ShieldCheck className={IconSize} /> }
 
 const workspaceMenu = [
   { name: 'Overview', path: '/overview', icon: <LayoutPanelTop className={IconSize} /> },
@@ -282,6 +288,9 @@ export default function Navigation() {
           </TooltipIfCollapsed>
           <NavItem to={mainMenu[1].path} icon={mainMenu[1].icon} label={mainMenu[1].name} collapsed={collapsed} />
           <NavItem to={mainMenu[2].path} icon={mainMenu[2].icon} label={mainMenu[2].name} collapsed={collapsed} badge={unreadPatchNotes !== 0} />
+          {user?.userPermission === 'administrator' && (
+            <NavItem to={adminMenu.path} icon={adminMenu.icon} label={adminMenu.name} collapsed={collapsed} />
+          )}
         </nav>
 
         <nav
