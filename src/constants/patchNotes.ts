@@ -98,6 +98,20 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
+    version: "0.7.2",
+    codename: undefined,
+    date: "2026-09-04",
+    highlight: true,
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.7.1", to: "0.7.2" },
+      { scope: "OPTiCS Landing", from: "0.0.0", to: "0.1.0" },
+    ],
+    changes: [
+      { kind: 'added', description: "랜딩페이지가 추가되었습니다." },
+      { kind: 'added', description: "랜딩페이지에서 필요한 공개 API를 추가했습니다." },
+    ]
+  },
+  {
     version: "0.7.1",
     codename: undefined,
     date: "2026-09-02",
