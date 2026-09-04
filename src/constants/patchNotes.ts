@@ -98,9 +98,25 @@ export const changeKindOrder: ChangeKind[] = ["added", "changed", "fixed", "secu
 
 export const patchNotes: PatchNoteEntry[] = [
   {
-    version: "0.7.2",
+    version: "0.7.3",
     codename: undefined,
     date: "2026-09-04",
+    highlight: true,
+    versions: [
+      { scope: "OPTiCS Hub", from: "0.7.2", to: "0.7.3" },
+      { scope: "OPTiCS Console", from: "0.7.0", to: "0.7.3" },
+    ],
+    changes: [
+      { kind: 'added', description: "서비스별로 트래픽을 차단할 수 있습니다. 컨테이너는 계속 실행된 채로 외부 요청만 거부되므로, 처리 중인 작업을 끊지 않고 노출만 즉시 닫을 수 있습니다." },
+      { kind: 'fixed', description: "OPTiCS Agent와 연결이 끊기면 그 Agent의 서비스가 Offline으로 표시됩니다. 직접 중지한 Stopped와 구분되며, Agent가 다시 연결되면 실제 상태로 돌아옵니다." },
+      { kind: 'fixed', description: "여러 기기에서 동시에 로그인 상태를 유지할 수 있습니다. 한 기기에서 로그아웃해도 다른 기기의 로그인이 풀리지 않습니다." },
+      { kind: 'fixed', description: "서비스에 접속할 수 없을 때 원인을 설명하는 OPTiCS Gateway의 오류 페이지가 나오지 않고 Cloudflare의 일반 오류 화면이 대신 표시되던 문제를 수정했습니다." },
+    ]
+  },
+  {
+    version: "0.7.2",
+    codename: undefined,
+    date: "2026-09-03",
     highlight: true,
     versions: [
       { scope: "OPTiCS Hub", from: "0.7.1", to: "0.7.2" },

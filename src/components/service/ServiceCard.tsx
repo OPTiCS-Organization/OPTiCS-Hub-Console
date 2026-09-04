@@ -1,6 +1,6 @@
-import { GitBranch, Package } from "lucide-react";
+import { GitBranch, Package, ShieldOff } from "lucide-react";
 import type { ContainerCounts, ServiceItem } from "../../interfaces/ServiceItem.interface";
-import { statusDot, statusLabel, presetLabel } from "../../constants/service";
+import { statusDot, statusLabel, statusText, presetLabel } from "../../constants/service";
 
 function parseSourceRepositories(raw: string) {
   try {
@@ -45,7 +45,7 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
             <span className="text-secondary-text-color/60 text-3xs shrink-0">{presetLabel[service.serviceDeployPreset]}</span>
           </div>
           <div className="flex items-center gap-1 text-2xs">
-            <span className={`font-medium ${service.serviceStatus === 'running' ? 'text-success-color' : service.serviceStatus === 'failed' ? 'text-danger-color' : 'text-secondary-text-color'}`}>
+            <span className={`font-medium ${statusText[service.serviceStatus]}`}>
               {statusLabel[service.serviceStatus]}
               {service.serviceStatus === 'running' && containerCounts && containerCounts.total > 0 && (
                 <span className="text-secondary-text-color/60 ml-0.5">
@@ -53,6 +53,19 @@ export default function ServiceCard({ service, containerCounts }: { service: Ser
                 </span>
               )}
             </span>
+            {/*
+              상태와 나란히 두되 별개로 읽혀야 한다. Running 옆에 이 배지가 함께 뜨는
+              조합이 정상이고, 그게 바로 목록에서 놓치면 안 되는 경우다.
+            */}
+            {service.trafficBlockedAt && (
+              <span
+                className="flex shrink-0 items-center gap-0.5 rounded-sm bg-danger-color/10 px-1 py-0.5 text-3xs font-medium text-danger-color"
+                title={service.trafficBlockReason ?? '트래픽 차단됨'}
+              >
+                <ShieldOff className="h-2.5 w-2.5" />
+                차단
+              </span>
+            )}
             {service.agentCode && (
               <>
                 <span className="text-secondary-text-color/40">·</span>

@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
-import { ArrowLeft, GitBranch, Loader2, Package, Pencil, Play, Plus, Square, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, EyeOff, GitBranch, Loader2, Megaphone, Package, Pencil, Play, Plus, ShieldCheck, ShieldOff, Square, RefreshCw, Trash2, X } from "lucide-react";
 import { apiFetch } from "../lib/apiFetch";
 import { useAuth } from "../context/Auth.context";
 import { useModal } from "../context/Modal.context";
 import { useWorkspace } from "../context/Workspace.context";
 import { useServiceLog } from "../hooks/useServiceLog";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { statusDot, statusLabel, presetLabel } from "../constants/service";
+import { statusDot, statusLabel, statusText, presetLabel } from "../constants/service";
 import type { ServiceEndpoint, ServiceItem } from "../interfaces/ServiceItem.interface";
 import ServiceForm from "../components/service/ServiceForm";
 import LogPanel from "../components/service/LogPanel";
+import TrafficBlockDialog, { type TrafficBlockMode } from "../components/service/TrafficBlockDialog";
 import Tooltip from "../components/ui/Tooltip";
 import { dangerNoticeClass } from "../constants/danger";
 
@@ -396,6 +397,7 @@ export default function ServiceDetail() {
     );
   }
   const isRemoved = service.serviceStatus === 'removed';
+  const isTrafficBlocked = Boolean(service.trafficBlockedAt);
   const portMappings = service.servicePortMappings && service.servicePortMappings.length > 0
     ? service.servicePortMappings
     : [{ hostPort: service.serviceHostPort ?? service.servicePort, containerPort: service.serviceContainerPort ?? service.servicePort }];
@@ -418,6 +420,50 @@ export default function ServiceDetail() {
     } catch (error) {
       console.log(error);
     }
+  }
+
+  /*
+   * 차단은 컨테이너를 건드리지 않으므로 STOP과 같은 줄에 두지 않는다.
+   * 상태(status)가 아니라 라우팅을 여닫는 동작이라, 성공하면 fetchService로 배너를 갱신한다.
+   */
+  async function handleBlockTraffic(options: { mode: TrafficBlockMode; reason: string }) {
+    const res = await apiFetch(`/v1/service/${serviceIndex}/traffic/block`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: options.mode, reason: options.reason.trim() || undefined }),
+    }, logout);
+    if (!res.ok) throw new Error('트래픽 차단에 실패했습니다.');
+    closeModal({ force: true });
+    void fetchService();
+  }
+
+  /** 해제는 되돌리는 방향이라 확인창을 두지 않는다. 실수로 눌러도 차단을 다시 걸면 된다. */
+  async function handleUnblockTraffic() {
+    try {
+      const res = await apiFetch(`/v1/service/${serviceIndex}/traffic/unblock`, { method: 'POST' }, logout);
+      if (!res.ok) console.log(await res.json());
+      else void fetchService();
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  function openTrafficBlockDialog() {
+    if (!service) return;
+    const workspaceSubdomain = currentWorkspace?.workspaceSubdomain;
+    const primarySubdomain = service.serviceSubdomain;
+    const address = workspaceSubdomain
+      ? [primarySubdomain, workspaceSubdomain, 'optics.run'].filter(Boolean).join('.')
+      : undefined;
+
+    openModal('트래픽 차단', (
+      <TrafficBlockDialog
+        serviceName={service.serviceName}
+        serviceAddress={address}
+        onConfirm={handleBlockTraffic}
+        onCancel={() => closeModal()}
+      />
+    ));
   }
 
   async function handleContainerAction(containerName: string, action: 'start' | 'stop' | 'restart') {
@@ -598,7 +644,7 @@ export default function ServiceDetail() {
               <h1 className="text-lg font-bold truncate">{service.serviceName}</h1>
               <span className="text-secondary-text-color/60 text-xs shrink-0">{presetLabel[service.serviceDeployPreset]}</span>
             </div>
-            <span className={`text-xs ${service.serviceStatus === 'running' ? 'text-success-color' : service.serviceStatus === 'failed' ? 'text-danger-color' : service.serviceStatus === 'starting' || service.serviceStatus === 'building' ? 'text-warning-color' : 'text-secondary-text-color'}`}>
+            <span className={`text-xs ${statusText[service.serviceStatus]}`}>
               {statusLabel[service.serviceStatus]}
               {containerCounts && containerCounts.total > 0 && (
                 <span className="text-secondary-text-color/60 ml-0.5">
@@ -632,6 +678,29 @@ export default function ServiceDetail() {
                   <Square className="w-4 h-4" />
                 </button>
               </Tooltip>
+              {isTrafficBlocked ? (
+                <Tooltip label="트래픽 차단 해제">
+                  <button
+                    type="button"
+                    onClick={() => { void handleUnblockTraffic(); }}
+                    className="p-1 rounded-sm text-danger-color transition-colors cursor-pointer hover:bg-success-color/10 hover:text-success-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success-color/50"
+                    aria-label="트래픽 차단 해제"
+                  >
+                    <ShieldOff className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+              ) : (
+                <Tooltip label="트래픽 차단">
+                  <button
+                    type="button"
+                    onClick={() => openTrafficBlockDialog()}
+                    className="p-1 rounded-sm text-secondary-text-color transition-colors cursor-pointer hover:bg-danger-color/10 hover:text-danger-color focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-color/50"
+                    aria-label="트래픽 차단"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+              )}
             </>
           )}
           <Tooltip label="재배포">
@@ -659,6 +728,37 @@ export default function ServiceDetail() {
           </Tooltip>
         </div>
       </div>
+
+      {/*
+        차단은 serviceStatus가 아니라 별도 축이라 상태 점으로는 드러나지 않는다.
+        running이면서 막혀 있는 상태가 정상적으로 존재하므로, 헤더 아래에 따로 띄워
+        "돌고 있는데 왜 안 들어가지"를 여기서 끊는다.
+      */}
+      {isTrafficBlocked && (
+        <div className={`mb-3 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 ${dangerNoticeClass}`}>
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-danger-color">
+            <ShieldOff className="h-3.5 w-3.5 shrink-0" />
+            트래픽 차단됨
+          </span>
+          <span className="flex items-center gap-1 text-2xs text-secondary-text-color">
+            {service.trafficBlockMode === 'hidden'
+              ? <><EyeOff className="h-3 w-3 shrink-0" />숨김 · 404로 응답</>
+              : <><Megaphone className="h-3 w-3 shrink-0" />안내 · 503으로 응답</>}
+          </span>
+          {service.trafficBlockReason && (
+            <span className="min-w-0 flex-1 truncate text-2xs text-secondary-text-color" title={service.trafficBlockReason}>
+              {service.trafficBlockReason}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => { void handleUnblockTraffic(); }}
+            className="ml-auto shrink-0 rounded-sm px-2 py-1 text-2xs font-semibold text-danger-color transition-colors cursor-pointer hover:bg-danger-color/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger-color/50"
+          >
+            차단 해제
+          </button>
+        </div>
+      )}
 
       {/* 탭 바 */}
       <div className="mb-3 flex shrink-0 items-center gap-1 border-b border-border-color">
