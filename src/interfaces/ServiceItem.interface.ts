@@ -49,7 +49,16 @@ export interface ServiceItem {
   serviceSourceUrl: string;
   serviceRootDirectory?: string | null;
   serviceEnv?: Record<string, string>;
-  serviceStatus: 'waiting' | 'building' | 'starting' | 'running' | 'stopped' | 'failed' | 'removed';
+  serviceStatus: 'waiting' | 'building' | 'starting' | 'running' | 'stopped' | 'offline' | 'failed' | 'removed';
+  /**
+   * 운영자가 트래픽을 끊은 시각. null이면 정상 통과.
+   *
+   * serviceStatus와 나란히 두되 섞지 않는다. 상태는 컨테이너가 어떤가이고 이건
+   * 라우팅을 열어 둘 것인가라서, running이면서 차단된 서비스가 정상적으로 존재한다.
+   */
+  trafficBlockedAt?: string | null;
+  trafficBlockMode?: 'notice' | 'hidden';
+  trafficBlockReason?: string | null;
   serviceSubdomain?: string | null;
   serviceVersion: string;
   serviceDeployPreset: 'dockerfile' | 'compose' | 'preset_nestjs';
